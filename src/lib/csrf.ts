@@ -7,6 +7,18 @@ const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const CSRF_EXPIRY_SECONDS = 60 * 60 * 24; // 24 hours
 
+// Paths that should be excluded from CSRF protection (auth-related endpoints)
+const CSRF_IGNORE_PATHS = [
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/logout',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
+    '/api/health',
+    '/api/init-db',
+    '/api/admin/settings/logo', // File upload uses FormData
+];
+
 /**
  * Generate and set CSRF token cookie
  */
@@ -20,15 +32,34 @@ export function setCSRFCookie(c: any): string {
 }
 
 /**
+ * Check if a path should be ignored for CSRF validation
+ */
+function shouldIgnorePath(path: string): boolean {
+    return CSRF_IGNORE_PATHS.some(ignorePath => {
+        if (ignorePath.endsWith('*')) {
+            return path.startsWith(ignorePath.slice(0, -1));
+        }
+        return path === ignorePath || path.startsWith(ignorePath + '/');
+    });
+}
+
+/**
  * CSRF protection middleware for Hono
  * Should be applied to all state-changing routes (POST, PUT, DELETE, PATCH)
  */
 export function csrfMiddleware() {
     return async (c: any, next: () => Promise<void>) => {
         const method = c.req.method.toUpperCase();
+        const path = new URL(c.req.url).pathname;
 
         // Skip for safe methods
         if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+            await next();
+            return;
+        }
+
+        // Skip for ignored paths (auth endpoints, etc.)
+        if (shouldIgnorePath(path)) {
             await next();
             return;
         }
@@ -43,15 +74,21 @@ export function csrfMiddleware() {
         // Validate tokens exist and match
         if (!cookieToken || !headerToken) {
             return c.json({
-                error: 'CSRF token tidak ditemukan',
-                code: 'CSRF_MISSING'
+                success: false,
+                error: {
+                    message: 'CSRF token tidak ditemukan',
+                    code: 'CSRF_MISSING'
+                }
             }, 403);
         }
 
         if (cookieToken !== headerToken) {
             return c.json({
-                error: 'CSRF token tidak valid',
-                code: 'CSRF_INVALID'
+                success: false,
+                error: {
+                    message: 'CSRF token tidak valid',
+                    code: 'CSRF_INVALID'
+                }
             }, 403);
         }
 

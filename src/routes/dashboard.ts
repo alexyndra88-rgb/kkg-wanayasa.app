@@ -455,4 +455,251 @@ dashboard.get('/health', async (c) => {
     }
 });
 
+// ============================================
+// Trend Statistics for Charts (Admin Only)
+// ============================================
+
+interface TrendData {
+    label: string;
+    value: number;
+}
+
+/**
+ * GET /api/dashboard/trends
+ * Get trend data for charts (admin only)
+ */
+dashboard.get('/trends', async (c) => {
+    const sessionId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
+    const user = await getCurrentUser(c.env.DB, sessionId);
+
+    if (!user) {
+        return Errors.unauthorized(c);
+    }
+
+    if (user.role !== 'admin') {
+        return Errors.forbidden(c);
+    }
+
+    try {
+        const db = c.env.DB;
+        const period = c.req.query('period') || 'weekly'; // weekly or monthly
+
+        let dateFormat: string;
+        let daysBack: number;
+
+        if (period === 'monthly') {
+            dateFormat = '%Y-%m';
+            daysBack = 365;
+        } else {
+            dateFormat = '%Y-%W';
+            daysBack = 90;
+        }
+
+        // Get various trend data
+        const [
+            userTrend,
+            kegiatanTrend,
+            absensiTrend,
+            suratTrend,
+            materiTrend,
+            forumTrend
+        ] = await Promise.all([
+            // User registrations
+            db.prepare(`
+                SELECT strftime('${dateFormat}', created_at) as period, COUNT(*) as count
+                FROM users
+                WHERE DATE(created_at) >= DATE('now', '-${daysBack} days')
+                GROUP BY period
+                ORDER BY period ASC
+            `).all(),
+
+            // Kegiatan created
+            db.prepare(`
+                SELECT strftime('${dateFormat}', created_at) as period, COUNT(*) as count
+                FROM kegiatan
+                WHERE DATE(created_at) >= DATE('now', '-${daysBack} days')
+                GROUP BY period
+                ORDER BY period ASC
+            `).all(),
+
+            // Absensi check-ins
+            db.prepare(`
+                SELECT strftime('${dateFormat}', waktu_checkin) as period, COUNT(*) as count
+                FROM absensi
+                WHERE DATE(waktu_checkin) >= DATE('now', '-${daysBack} days')
+                GROUP BY period
+                ORDER BY period ASC
+            `).all(),
+
+            // Surat generated
+            db.prepare(`
+                SELECT strftime('${dateFormat}', created_at) as period, COUNT(*) as count
+                FROM surat_undangan
+                WHERE DATE(created_at) >= DATE('now', '-${daysBack} days')
+                GROUP BY period
+                ORDER BY period ASC
+            `).all(),
+
+            // Materi uploaded
+            db.prepare(`
+                SELECT strftime('${dateFormat}', created_at) as period, COUNT(*) as count
+                FROM materi
+                WHERE DATE(created_at) >= DATE('now', '-${daysBack} days')
+                GROUP BY period
+                ORDER BY period ASC
+            `).all(),
+
+            // Forum posts
+            db.prepare(`
+                SELECT strftime('${dateFormat}', created_at) as period, COUNT(*) as count
+                FROM forum_threads
+                WHERE DATE(created_at) >= DATE('now', '-${daysBack} days')
+                GROUP BY period
+                ORDER BY period ASC
+            `).all(),
+        ]);
+
+        const formatTrend = (results: any) => {
+            return (results.results || []).map((r: any) => ({
+                period: r.period,
+                count: r.count
+            }));
+        };
+
+        const trends = {
+            period,
+            users: formatTrend(userTrend),
+            kegiatan: formatTrend(kegiatanTrend),
+            absensi: formatTrend(absensiTrend),
+            surat: formatTrend(suratTrend),
+            materi: formatTrend(materiTrend),
+            forum: formatTrend(forumTrend),
+        };
+
+        logger.info('Dashboard trends fetched', { userId: user.id, period });
+        return successResponse(c, trends);
+    } catch (error: any) {
+        logger.error('Failed to fetch trends', error);
+        return Errors.internal(c);
+    }
+});
+
+/**
+ * GET /api/dashboard/summary
+ * Get comprehensive summary for admin dashboard
+ */
+dashboard.get('/summary', async (c) => {
+    const sessionId = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
+    const user = await getCurrentUser(c.env.DB, sessionId);
+
+    if (!user) {
+        return Errors.unauthorized(c);
+    }
+
+    if (user.role !== 'admin') {
+        return Errors.forbidden(c);
+    }
+
+    try {
+        const db = c.env.DB;
+
+        const [
+            totalUsers,
+            totalKegiatan,
+            totalSurat,
+            totalMateri,
+            totalForum,
+            todayAbsensi,
+            thisWeekKegiatan,
+            recentAudit
+        ] = await Promise.all([
+            db.prepare('SELECT COUNT(*) as count FROM users').first(),
+            db.prepare('SELECT COUNT(*) as count FROM kegiatan').first(),
+            db.prepare('SELECT COUNT(*) as count FROM surat_undangan').first(),
+            db.prepare('SELECT COUNT(*) as count FROM materi').first(),
+            db.prepare('SELECT COUNT(*) as count FROM forum_threads').first(),
+            db.prepare(`
+                SELECT COUNT(*) as count FROM absensi
+                WHERE DATE(waktu_checkin) = DATE('now')
+            `).first(),
+            db.prepare(`
+                SELECT COUNT(*) as count FROM kegiatan
+                WHERE DATE(tanggal) >= DATE('now', '-7 days')
+            `).first(),
+            db.prepare(`
+                SELECT COUNT(*) as count FROM audit_logs
+                WHERE DATE(created_at) = DATE('now')
+            `).first(),
+        ]);
+
+        // Percentages (compared to last week)
+        const [
+            lastWeekUsers,
+            lastWeekSurat
+        ] = await Promise.all([
+            db.prepare(`
+                SELECT COUNT(*) as count FROM users
+                WHERE DATE(created_at) >= DATE('now', '-14 days')
+                AND DATE(created_at) < DATE('now', '-7 days')
+            `).first(),
+            db.prepare(`
+                SELECT COUNT(*) as count FROM surat_undangan
+                WHERE DATE(created_at) >= DATE('now', '-14 days')
+                AND DATE(created_at) < DATE('now', '-7 days')
+            `).first(),
+        ]);
+
+        const thisWeekUsers = await db.prepare(`
+            SELECT COUNT(*) as count FROM users
+            WHERE DATE(created_at) >= DATE('now', '-7 days')
+        `).first();
+
+        const thisWeekSurat = await db.prepare(`
+            SELECT COUNT(*) as count FROM surat_undangan
+            WHERE DATE(created_at) >= DATE('now', '-7 days')
+        `).first();
+
+        const calcChange = (current: number, previous: number) => {
+            if (previous === 0) return current > 0 ? 100 : 0;
+            return Math.round(((current - previous) / previous) * 100);
+        };
+
+        const summary = {
+            totals: {
+                users: (totalUsers as any)?.count || 0,
+                kegiatan: (totalKegiatan as any)?.count || 0,
+                surat: (totalSurat as any)?.count || 0,
+                materi: (totalMateri as any)?.count || 0,
+                forum: (totalForum as any)?.count || 0,
+            },
+            today: {
+                absensi: (todayAbsensi as any)?.count || 0,
+                auditLogs: (recentAudit as any)?.count || 0,
+            },
+            thisWeek: {
+                kegiatan: (thisWeekKegiatan as any)?.count || 0,
+                newUsers: (thisWeekUsers as any)?.count || 0,
+                newSurat: (thisWeekSurat as any)?.count || 0,
+            },
+            changes: {
+                users: calcChange(
+                    (thisWeekUsers as any)?.count || 0,
+                    (lastWeekUsers as any)?.count || 0
+                ),
+                surat: calcChange(
+                    (thisWeekSurat as any)?.count || 0,
+                    (lastWeekSurat as any)?.count || 0
+                ),
+            },
+            timestamp: new Date().toISOString(),
+        };
+
+        logger.info('Dashboard summary fetched', { userId: user.id });
+        return successResponse(c, summary);
+    } catch (error: any) {
+        logger.error('Failed to fetch summary', error);
+        return Errors.internal(c);
+    }
+});
+
 export default dashboard;

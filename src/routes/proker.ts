@@ -200,4 +200,78 @@ proker.delete('/:id', async (c) => {
   }
 });
 
+// Download proker as DOCX
+proker.get('/:id/download', async (c) => {
+  const sessionId = getCookie(c.req.header('Cookie'), 'session');
+  const user: any = await getCurrentUser(c.env.DB, sessionId);
+
+  if (!user) {
+    return Errors.unauthorized(c);
+  }
+
+  try {
+    const id = c.req.param('id');
+
+    if (!id || isNaN(Number(id))) {
+      return Errors.validation(c, 'ID program kerja tidak valid');
+    }
+
+    const result: any = await c.env.DB.prepare(`
+      SELECT * FROM program_kerja 
+      WHERE id = ? AND user_id = ?
+    `).bind(id, user.id).first();
+
+    if (!result) {
+      return Errors.notFound(c, 'Program kerja');
+    }
+
+    // Get KKG settings
+    const settingsResult = await c.env.DB.prepare(
+      "SELECT key, value FROM settings WHERE key IN ('nama_ketua', 'alamat_sekretariat')"
+    ).all();
+
+    const settings: any = {};
+    settingsResult.results?.forEach((row: any) => {
+      settings[row.key] = row.value;
+    });
+
+    // Parse kegiatan JSON
+    let kegiatan = [];
+    if (result.kegiatan) {
+      try {
+        kegiatan = JSON.parse(result.kegiatan);
+      } catch { }
+    }
+
+    // Import and generate DOCX
+    const { generateProkerBuffer } = await import('../lib/docx-generator');
+
+    const buffer = await generateProkerBuffer({
+      tahun_ajaran: result.tahun_ajaran,
+      visi: result.visi,
+      misi: result.misi,
+      kegiatan: kegiatan,
+      analisis_kebutuhan: result.analisis_kebutuhan,
+      isi_dokumen: result.isi_dokumen,
+      created_at: result.created_at
+    }, settings);
+
+    // Generate filename
+    const filename = `Program_Kerja_KKG_${result.tahun_ajaran.replace(/\//g, '-')}.docx`;
+
+    // Return as downloadable file
+    return new Response(buffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-cache'
+      }
+    });
+
+  } catch (e: any) {
+    console.error('Download proker error:', e);
+    return Errors.internal(c);
+  }
+});
+
 export default proker;

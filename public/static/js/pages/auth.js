@@ -85,6 +85,12 @@ export function renderLogin() {
                   <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
                 </span>
               </button>
+              
+              <div class="text-center">
+                <a href="javascript:void(0)" onclick="navigate('reset-password')" class="text-sm text-white/70 hover:text-white transition">
+                  <i class="fas fa-key mr-1"></i>Lupa Password?
+                </a>
+              </div>
             </div>
           </form>
 

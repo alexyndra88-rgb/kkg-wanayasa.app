@@ -95,6 +95,10 @@ export const ErrorCodes = {
     CONFIG_ERROR: 'CONFIG_ERROR',
     API_KEY_MISSING: 'API_KEY_MISSING',
 
+    // Token errors
+    INVALID_TOKEN: 'INVALID_TOKEN',
+    TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+
     // Duplicate error (409)
     DUPLICATE: 'DUPLICATE',
 } as const;

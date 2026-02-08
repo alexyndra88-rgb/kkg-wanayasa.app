@@ -12,6 +12,41 @@ type Bindings = { DB: D1Database };
 const surat = new Hono<{ Bindings: Bindings }>();
 
 // ============================================
+// Get Surat Settings (Kop & Signer)
+// ============================================
+surat.get('/settings', async (c) => {
+  try {
+    const settings = await c.env.DB.prepare(`
+      SELECT key, value FROM settings 
+      WHERE key IN ('nama_ketua', 'nip_ketua', 'alamat_sekretariat', 'logo_url', 'kabupaten', 'kecamatan', 'gugus')
+    `).all();
+
+    // Transform array to object
+    const savedSettings: any = {};
+    if (settings.results) {
+      settings.results.forEach((s: any) => {
+        savedSettings[s.key] = s.value;
+      });
+    }
+
+    // Defaults
+    const defaults = {
+      nama_ketua: 'Admin KKG Gugus 3', // Fallback
+      nip_ketua: '198501012010011001',
+      alamat_sekretariat: 'SDN 1 Wanayasa, Jl. Raya Wanayasa No. 1, Kec. Wanayasa, Kab. Purwakarta',
+      kabupaten: 'Purwakarta',
+      kecamatan: 'Wanayasa',
+      gugus: '03'
+    };
+
+    return successResponse(c, { ...defaults, ...savedSettings });
+  } catch (e: any) {
+    logger.error('Get surat settings error', e);
+    return Errors.internal(c);
+  }
+});
+
+// ============================================
 // Generate Surat Undangan (AI)
 // ============================================
 surat.post('/generate', rateLimitMiddleware(RATE_LIMITS.ai), async (c) => {
@@ -303,6 +338,87 @@ surat.delete('/:id', async (c) => {
     return successResponse(c, null, 'Surat berhasil dihapus');
   } catch (e: any) {
     logger.error('Delete surat error', e, { userId: user.id });
+    return Errors.internal(c);
+  }
+});
+
+// ============================================
+// Download Surat as DOCX
+// ============================================
+surat.get('/:id/download', async (c) => {
+  const sessionId = getCookie(c.req.header('Cookie'), 'session');
+  const user: any = await getCurrentUser(c.env.DB, sessionId);
+
+  if (!user) {
+    return Errors.unauthorized(c);
+  }
+
+  try {
+    const idValidation = validateId(c.req.param('id'));
+    if (!idValidation.valid) {
+      return Errors.validation(c, idValidation.message);
+    }
+
+    // Get surat data
+    const result: any = await c.env.DB.prepare(`
+      SELECT * FROM surat_undangan 
+      WHERE id = ? AND user_id = ?
+    `).bind(idValidation.id, user.id).first();
+
+    if (!result) {
+      return Errors.notFound(c, 'Surat');
+    }
+
+    // Get KKG settings
+    const settingsResult = await c.env.DB.prepare(
+      "SELECT key, value FROM settings WHERE key IN ('nama_ketua', 'alamat_sekretariat')"
+    ).all();
+
+    const settings: any = {};
+    settingsResult.results?.forEach((row: any) => {
+      settings[row.key] = row.value;
+    });
+
+    // Parse peserta JSON
+    let peserta = [];
+    if (result.peserta) {
+      try {
+        peserta = JSON.parse(result.peserta);
+      } catch { }
+    }
+
+    // Import and generate DOCX
+    const { generateSuratBuffer } = await import('../lib/docx-generator');
+
+    const buffer = await generateSuratBuffer({
+      nomor_surat: result.nomor_surat,
+      jenis_kegiatan: result.jenis_kegiatan,
+      tanggal_kegiatan: result.tanggal_kegiatan,
+      waktu_kegiatan: result.waktu_kegiatan,
+      tempat_kegiatan: result.tempat_kegiatan,
+      agenda: result.agenda,
+      peserta: peserta,
+      penanggung_jawab: result.penanggung_jawab,
+      isi_surat: result.isi_surat,
+      created_at: result.created_at
+    }, settings);
+
+    // Generate filename
+    const filename = `Surat_Undangan_${result.jenis_kegiatan.replace(/\s+/g, '_')}_${result.nomor_surat.replace(/\//g, '-')}.docx`;
+
+    logger.info('Surat downloaded', { userId: user.id, suratId: idValidation.id });
+
+    // Return as downloadable file
+    return new Response(buffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-cache'
+      }
+    });
+
+  } catch (e: any) {
+    logger.error('Download surat error', e, { userId: user.id });
     return Errors.internal(c);
   }
 });

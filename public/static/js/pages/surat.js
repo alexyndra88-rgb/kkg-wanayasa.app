@@ -27,8 +27,34 @@ export function renderSurat() {
     ` : ''}
 
     <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 md:p-8 border border-gray-100 dark:border-gray-700">
+      <!-- Mode Tabs -->
+      <div class="flex gap-2 mb-6 border-b dark:border-gray-700 pb-4">
+        <button type="button" onclick="switchSuratMode('ai')" id="mode-ai" class="px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-blue-600 dark:text-blue-400">
+          <i class="fas fa-magic mr-1"></i>Generate dengan AI
+        </button>
+        <button type="button" onclick="switchSuratMode('template')" id="mode-template" class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+          <i class="fas fa-file-alt mr-1"></i>Gunakan Template
+        </button>
+      </div>
+
+      <!-- Template Selector (hidden by default) -->
+      <div id="template-selector" class="hidden mb-6">
+        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2"><i class="fas fa-file-alt mr-1 text-orange-400"></i>Pilih Template Surat</label>
+        <select id="template_id" onchange="loadTemplateForSurat()" class="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition">
+          <option value="">-- Pilih Template --</option>
+        </select>
+        <p id="template-desc" class="text-xs text-gray-400 mt-1"></p>
+      </div>
+
+      <!-- Template Variables Form (dynamic) -->
+      <div id="template-variables-form" class="hidden mb-6">
+        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3"><i class="fas fa-edit mr-1 text-green-400"></i>Isi Data Surat</h3>
+        <div id="template-variables-fields" class="grid md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <!-- AI Form -->
       <form id="surat-form" onsubmit="generateSurat(event)">
-        <div class="grid md:grid-cols-2 gap-6">
+        <div id="ai-form-fields" class="grid md:grid-cols-2 gap-6">
           <div>
             <label for="jenis_kegiatan" class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2"><i class="fas fa-tag mr-1 text-blue-400" aria-hidden="true"></i>Jenis Kegiatan <span class="text-red-500">*</span></label>
             <select id="jenis_kegiatan" name="jenis_kegiatan" required class="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition" aria-required="true">
@@ -92,6 +118,12 @@ export function renderSurat() {
           <i class="fas fa-magic mr-2" aria-hidden="true"></i>Generate Surat dengan AI
         </button>
       </form>
+
+      <!-- Template Generate Button (hidden by default) -->
+      <button type="button" id="generate-from-template-btn" onclick="generateFromTemplateNew()" ${!state.user ? 'disabled' : ''} 
+        class="hidden mt-8 w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:from-gray-300 disabled:to-gray-400 text-white font-bold rounded-xl transition shadow-lg shadow-orange-500/30 text-lg focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2">
+        <i class="fas fa-file-alt mr-2" aria-hidden="true"></i>Buat Surat dari Template
+      </button>
     </div>
 
     <div id="surat-result" class="hidden mt-8">
@@ -225,178 +257,202 @@ window.downloadSuratPDF = function () {
   win.document.close();
 }
 
-window.downloadSuratDocx = function () {
+window.downloadSuratDocx = async function () {
+  // If no data
+  if (!currentSuratData) {
+    showToast('Tidak ada surat untuk diunduh. Silakan generate atau pilih surat terlebih dahulu.', 'warning');
+    return;
+  }
+
+  // If no ID (template preview), use client-side generation
+  if (!currentSuratData.id) {
+    return window.downloadSuratDocxClientSide();
+  }
+
+  try {
+    showToast('Mengunduh dokumen...', 'info');
+
+    // Use server-side DOCX generation
+    const response = await fetch(`/api/surat/${currentSuratData.id}/download`, {
+      method: 'GET',
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Gagal mengunduh dokumen' }));
+      throw new Error(error.message || 'Gagal mengunduh dokumen');
+    }
+
+    // Get blob and download
+    const blob = await response.blob();
+    const filename = `Surat_Undangan_${currentSuratData.jenis_kegiatan || 'KKG'}_${new Date().toISOString().slice(0, 10)}.docx`.replace(/\s+/g, '_');
+
+    // Create download link
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    a.remove();
+
+    showToast('Surat berhasil diunduh sebagai DOCX', 'success');
+  } catch (error) {
+    console.error('DOCX download error:', error);
+    showToast('Gagal mengunduh dokumen: ' + error.message, 'error');
+  }
+}
+
+// Fallback client-side DOCX generation (in case server fails)
+// Fallback client-side DOCX generation (in case server fails)
+// Fallback client-side DOCX generation (in case server fails)
+window.downloadSuratDocxClientSide = async function () {
   const content = document.getElementById('surat-content').textContent;
   if (!content) {
     showToast('Tidak ada surat untuk diunduh', 'warning');
     return;
   }
 
+  // Fetch logo if settings loaded
+  let logoBuffer = null;
+  if (typeof letterSettings !== 'undefined' && letterSettings?.logo_url) {
+    try {
+      const resp = await fetch(letterSettings.logo_url);
+      if (resp.ok) logoBuffer = await resp.arrayBuffer();
+    } catch (e) {
+      console.warn("Failed to load logo", e);
+    }
+  }
+
   try {
-    const { Document, Paragraph, TextRun, AlignmentType, BorderStyle, convertInchesToTwip, HeadingLevel } = docx;
+    const docxLib = window.docx;
+    if (!docxLib) throw new Error('Library DOCX belum dimuat. Silakan refresh halaman.');
+
+    // Destructure needed modules - check lib version compatibility
+    const { Document, Paragraph, TextRun, AlignmentType, BorderStyle, convertInchesToTwip, Table, TableRow, TableCell, WidthType, ImageRun, VerticalAlign } = docxLib;
 
     const lines = content.split('\n');
-    const children = [];
+    const headerLines = [];
+    const bodyLines = [];
+    const footerLines = [];
 
-    // Parse content sections
-    let section = 'kop'; // kop, metadata, body
-    let kopEndIndex = -1;
-    let dateLineIndex = -1;
+    let section = 'HEADER';
 
-    // Identify sections
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].toLowerCase().trim();
-      if (line.includes('nomor') || line.includes('lampiran') || line.includes('perihal')) {
-        if (kopEndIndex === -1) kopEndIndex = i;
-        section = 'metadata';
+    // Parse content
+    for (const line of lines) {
+      const txt = line.trim();
+      if (txt.includes('_____')) {
+        section = 'BODY';
+        continue;
       }
-      // Find date line (Purwakarta, tanggal)
-      if (line.includes('purwakarta,') || (line.includes('februari') && line.includes('202'))) {
-        dateLineIndex = i;
+
+      if (section === 'HEADER') {
+        if (txt) headerLines.push(txt);
+      } else if (section === 'BODY') {
+        // Check footer start
+        if (txt.match(/^[A-Za-z\s]+,\s+\d+\s+[A-Za-z]+\s+\d{4}$/) || txt.startsWith('Ketua KKG') || txt.startsWith('Kepala')) {
+          section = 'FOOTER';
+          footerLines.push(txt);
+        } else {
+          bodyLines.push(txt);
+        }
+      } else {
+        footerLines.push(txt);
       }
     }
-    if (kopEndIndex === -1) kopEndIndex = 5; // Default
 
-    lines.forEach((line, index) => {
-      const trimmedLine = line.trim();
-      const lowerLine = line.toLowerCase();
+    const docChildren = [];
 
-      // Skip empty lines at start
-      if (index < 2 && !trimmedLine) return;
+    // 1. Header (Table with Logo)
+    if (headerLines.length > 0) {
+      const headerParagraphs = headerLines.map(text => new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 40 },
+        children: [new TextRun({ text, font: 'Times New Roman', size: text.startsWith('Alamat') ? 20 : 24, bold: !text.startsWith('Alamat') })]
+      }));
 
-      // KOP SURAT - Smaller fonts
-      if (index < kopEndIndex) {
-        if (!trimmedLine) return;
-
-        // Determine font size for kop (smaller)
-        let fontSize = 22; // 11pt default
-        let isBold = true;
-
-        if (lowerLine.includes('pemerintah')) fontSize = 24; // 12pt
-        else if (lowerLine.includes('dinas')) fontSize = 22;
-        else if (lowerLine.includes('kelompok kerja') || lowerLine.includes('kkg')) fontSize = 22;
-        else if (lowerLine.includes('alamat') || lowerLine.includes('email')) { fontSize = 20; isBold = false; }
-
-        children.push(new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 40, line: 240 },
-          children: [
-            new TextRun({
-              text: trimmedLine,
-              font: 'Times New Roman',
-              size: fontSize,
-              bold: isBold
-            })
-          ]
-        }));
-
-        // Add double line border after kop
-        if (index === kopEndIndex - 1 || (lowerLine.includes('email') || lowerLine.includes('@'))) {
-          children.push(new Paragraph({
-            border: { bottom: { color: '000000', space: 1, size: 12, style: BorderStyle.DOUBLE } },
-            spacing: { after: 200 }
-          }));
-        }
-        return;
-      }
-
-      // DATE LINE - Right aligned after kop
-      if (index === dateLineIndex || (lowerLine.includes('purwakarta,') && lowerLine.includes('202'))) {
-        children.push(new Paragraph({
+      const logoCellChildren = [];
+      if (logoBuffer) {
+        logoCellChildren.push(new Paragraph({
           alignment: AlignmentType.RIGHT,
-          spacing: { before: 200, after: 200 },
-          children: [
-            new TextRun({
-              text: trimmedLine,
-              font: 'Times New Roman',
-              size: 24,
-              bold: false
-            })
-          ]
+          children: [new ImageRun({ data: logoBuffer, transformation: { width: 80, height: 80 } })]
         }));
-        return;
+      } else {
+        logoCellChildren.push(new Paragraph({}));
       }
 
-      // NOMOR/LAMPIRAN/PERIHAL lines
-      if (lowerLine.includes('nomor') || lowerLine.includes('lampiran') || lowerLine.includes('perihal')) {
-        children.push(new Paragraph({
-          alignment: AlignmentType.LEFT,
-          spacing: { after: 40 },
-          children: [
-            new TextRun({
-              text: trimmedLine,
-              font: 'Times New Roman',
-              size: 24
-            })
-          ]
-        }));
-        return;
+      docChildren.push(new Table({
+        columnWidths: [convertInchesToTwip(5.5), convertInchesToTwip(1.5)],
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                children: headerParagraphs,
+                width: { size: 80, type: WidthType.PERCENTAGE },
+                borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }
+              }),
+              new TableCell({
+                children: logoCellChildren,
+                width: { size: 20, type: WidthType.PERCENTAGE },
+                verticalAlign: VerticalAlign ? VerticalAlign.CENTER : undefined,
+                borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }
+              })
+            ]
+          })
+        ],
+        borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 24, space: 1 }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }
+      }));
+
+      // Separation
+      docChildren.push(new Paragraph({ spacing: { before: 240 } }));
+    }
+
+    // 2. Body
+    for (const line of bodyLines) {
+      if (!line.trim()) {
+        docChildren.push(new Paragraph({ spacing: { after: 120 } }));
+        continue;
       }
 
-      // KEPADA YTH. and address - Left aligned
-      if (lowerLine.includes('kepada yth') || lowerLine.includes('di tempat') ||
-        lowerLine.includes('bapak/ibu') || lowerLine.includes('guru pendamping')) {
-        children.push(new Paragraph({
-          alignment: AlignmentType.LEFT,
-          spacing: { after: 40 },
-          indent: { left: convertInchesToTwip(0.5) },
-          children: [
-            new TextRun({
-              text: trimmedLine,
-              font: 'Times New Roman',
-              size: 24
-            })
-          ]
-        }));
-        return;
-      }
+      const isBoldKey = line.startsWith('Nomor') || line.startsWith('Perihal') || line.startsWith('Lampiran');
 
-      // SIGNATURE section - Right aligned
-      if (lowerLine.includes('hormat kami') || lowerLine.includes('ketua kkg') ||
-        lowerLine.includes('nama lengkap') || lowerLine.includes('nip') ||
-        lowerLine.startsWith('_____') || trimmedLine === '___') {
-        children.push(new Paragraph({
-          alignment: AlignmentType.RIGHT,
-          spacing: { after: 40 },
-          indent: { left: convertInchesToTwip(3.5) },
-          children: [
-            new TextRun({
-              text: trimmedLine,
-              font: 'Times New Roman',
-              size: 24
-            })
-          ]
-        }));
-        return;
-      }
-
-      // BODY TEXT - Justified
-      children.push(new Paragraph({
+      docChildren.push(new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
         spacing: { after: 120, line: 276 },
-        children: [
-          new TextRun({
-            text: line,
-            font: 'Times New Roman',
-            size: 24
-          })
-        ]
+        children: [new TextRun({ text: line, font: 'Times New Roman', size: 24, bold: isBoldKey })]
       }));
-    });
+    }
+
+    // 3. Footer
+    for (const line of footerLines) {
+      if (!line.trim()) {
+        docChildren.push(new Paragraph({ spacing: { after: 120 } }));
+        continue;
+      }
+
+      const isDate = line.match(/^[A-Za-z\s]+,\s+\d+\s+[A-Za-z]+\s+\d{4}$/);
+      const isNip = line.startsWith('NIP');
+      const isTitle = line.startsWith('Ketua') || line.startsWith('Kepala') || line.startsWith('Sekretaris');
+      const isName = !isDate && !isTitle && !isNip && line.length > 2;
+
+      docChildren.push(new Paragraph({
+        indent: { left: convertInchesToTwip(4) },
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 60 },
+        children: [new TextRun({ text: line, font: 'Times New Roman', size: 24, bold: isName, underline: isName ? {} : undefined })]
+      }));
+    }
 
     const doc = new Document({
       sections: [{
         properties: {
           page: {
-            margin: {
-              top: convertInchesToTwip(0.75),
-              right: convertInchesToTwip(1),
-              bottom: convertInchesToTwip(0.75),
-              left: convertInchesToTwip(1.25),
-            }
+            margin: { top: convertInchesToTwip(1), right: convertInchesToTwip(1), bottom: convertInchesToTwip(1), left: convertInchesToTwip(1) }
           }
         },
-        children: children
+        children: docChildren
       }]
     });
 
@@ -410,11 +466,6 @@ window.downloadSuratDocx = function () {
     console.error('DOCX generation error:', error);
     showToast('Gagal membuat dokumen DOCX: ' + error.message, 'error');
   }
-}
-
-// Fallback simple DOCX download
-window.downloadSuratDocxSimple = function () {
-  window.downloadSuratDocx();
 }
 
 window.editSuratContent = function () {
@@ -499,4 +550,331 @@ window.deleteSurat = async function (id) {
     showToast('Surat berhasil dihapus', 'success');
     loadSuratHistory();
   } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ============================================
+// Template Integration Functions
+// ============================================
+
+let currentSuratMode = 'ai';
+let loadedTemplates = [];
+let selectedTemplate = null;
+let letterSettings = null;
+
+async function fetchLetterSettings() {
+  if (letterSettings) return;
+  try {
+    const res = await api('/surat/settings');
+    letterSettings = res.data;
+  } catch (e) {
+    console.error('Fetch settings error:', e);
+    // Fallback defaults
+    letterSettings = {
+      nama_ketua: 'Admin KKG Gugus 3',
+      nip_ketua: '-',
+      alamat_sekretariat: 'Wanayasa',
+      kabupaten: 'Purwakarta',
+      kecamatan: 'Wanayasa',
+      gugus: '03'
+    };
+  }
+}
+
+// Switch between AI and Template mode
+window.switchSuratMode = function (mode) {
+  currentSuratMode = mode;
+
+  // Update tab styles
+  const aiTab = document.getElementById('mode-ai');
+  const templateTab = document.getElementById('mode-template');
+
+  if (mode === 'ai') {
+    aiTab.classList.add('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+    aiTab.classList.remove('text-gray-500', 'dark:text-gray-400');
+    templateTab.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+    templateTab.classList.add('text-gray-500', 'dark:text-gray-400');
+
+    // Show AI form, hide template
+    document.getElementById('ai-form-fields').classList.remove('hidden');
+    document.getElementById('generate-surat-btn').classList.remove('hidden');
+    document.getElementById('template-selector').classList.add('hidden');
+    document.getElementById('template-variables-form').classList.add('hidden');
+    document.getElementById('generate-from-template-btn').classList.add('hidden');
+  } else {
+    templateTab.classList.add('border-b-2', 'border-orange-500', 'text-orange-600', 'dark:text-orange-400');
+    templateTab.classList.remove('text-gray-500', 'dark:text-gray-400');
+    aiTab.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+    aiTab.classList.add('text-gray-500', 'dark:text-gray-400');
+
+    // Hide AI form, show template
+    document.getElementById('ai-form-fields').classList.add('hidden');
+    document.getElementById('generate-surat-btn').classList.add('hidden');
+    document.getElementById('template-selector').classList.remove('hidden');
+    document.getElementById('generate-from-template-btn').classList.remove('hidden');
+
+    // Load settings and templates if not loaded
+    fetchLetterSettings();
+    if (loadedTemplates.length === 0) {
+      loadTemplatesForSurat();
+    }
+  }
+}
+
+// Load available templates
+async function loadTemplatesForSurat() {
+  try {
+    const res = await api('/templates?active=true');
+    loadedTemplates = res.data || [];
+
+    const select = document.getElementById('template_id');
+    select.innerHTML = '<option value="">-- Pilih Template --</option>';
+
+    // Group by jenis
+    const grouped = {};
+    loadedTemplates.forEach(t => {
+      if (!grouped[t.jenis]) grouped[t.jenis] = [];
+      grouped[t.jenis].push(t);
+    });
+
+    Object.entries(grouped).forEach(([jenis, templates]) => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = jenis.charAt(0).toUpperCase() + jenis.slice(1);
+      templates.forEach(t => {
+        const option = document.createElement('option');
+        option.value = t.id;
+        option.textContent = t.nama;
+        optgroup.appendChild(option);
+      });
+      select.appendChild(optgroup);
+    });
+  } catch (e) {
+    console.error('Load templates error:', e);
+    showToast('Gagal memuat template', 'error');
+  }
+}
+
+// Load selected template and show variable fields
+window.loadTemplateForSurat = async function () {
+  const templateId = document.getElementById('template_id').value;
+
+  if (!templateId) {
+    document.getElementById('template-variables-form').classList.add('hidden');
+    document.getElementById('template-desc').textContent = '';
+    selectedTemplate = null;
+    return;
+  }
+
+  try {
+    const res = await api(`/templates/${templateId}`);
+    selectedTemplate = res.data;
+
+    // Show description
+    document.getElementById('template-desc').textContent = selectedTemplate.deskripsi || '';
+
+    // Build variable fields
+    const variables = selectedTemplate.variables || [];
+    const fieldsContainer = document.getElementById('template-variables-fields');
+
+    if (variables.length === 0) {
+      fieldsContainer.innerHTML = '<p class="text-gray-400 text-sm col-span-2">Template ini tidak memerlukan input data.</p>';
+    } else {
+      fieldsContainer.innerHTML = variables.map(v => {
+        // Generate user-friendly label
+        const label = v.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const isTextarea = ['isi_edaran', 'acara', 'materi', 'agenda'].includes(v);
+
+        return `
+          <div class="${isTextarea ? 'md:col-span-2' : ''}">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">${label}</label>
+            ${isTextarea
+            ? `<textarea id="var-${v}" name="var-${v}" rows="3" placeholder="Isi ${label.toLowerCase()}..." class="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition"></textarea>`
+            : `<input type="${v.includes('tanggal') ? 'date' : 'text'}" id="var-${v}" name="var-${v}" placeholder="Isi ${label.toLowerCase()}..." class="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-2 focus:ring-orange-500 focus:outline-none transition">`
+          }
+          </div>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('template-variables-form').classList.remove('hidden');
+  } catch (e) {
+    console.error('Load template error:', e);
+    showToast('Gagal memuat template', 'error');
+  }
+}
+
+// Generate surat from template
+window.generateFromTemplate = async function () {
+  if (!selectedTemplate) {
+    showToast('Pilih template terlebih dahulu', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('generate-from-template-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Membuat Surat...';
+
+  try {
+    // Collect variable values
+    const variables = selectedTemplate.variables || [];
+    const data = {};
+
+    for (const v of variables) {
+      const input = document.getElementById(`var-${v}`);
+      if (input) {
+        const value = input.value.trim();
+        // Format date if needed
+        if (v.includes('tanggal') && value) {
+          const date = new Date(value);
+          data[v] = date.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        } else {
+          data[v] = value || `[${v}]`;
+        }
+      }
+    }
+
+    // Replace variables in template content
+    let content = selectedTemplate.konten;
+    for (const [key, value] of Object.entries(data)) {
+      content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+    }
+
+    // Store for export
+    currentSuratData = {
+      id: null,
+      nomor_surat: generateTempNomorSurat(selectedTemplate.jenis),
+      jenis_kegiatan: selectedTemplate.nama,
+      tanggal_kegiatan: data.tanggal || new Date().toISOString().split('T')[0],
+      isi_surat: content,
+      template_id: selectedTemplate.id,
+      created_at: new Date().toISOString()
+    };
+
+    // Show result
+    document.getElementById('surat-content').textContent = content;
+    document.getElementById('surat-result').classList.remove('hidden');
+    document.getElementById('surat-result').scrollIntoView({ behavior: 'smooth' });
+
+    showToast('Surat berhasil dibuat dari template!', 'success');
+  } catch (e) {
+    console.error('Generate from template error:', e);
+    showToast(e.message || 'Gagal membuat surat', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-file-alt mr-2"></i>Buat Surat dari Template';
+  }
+}
+
+// Generate temporary nomor surat
+function generateTempNomorSurat(jenis) {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+  const jenisCode = {
+    'undangan': 'UND',
+    'tugas': 'TGS',
+    'keterangan': 'KET',
+    'edaran': 'EDR',
+    'permohonan': 'PHN',
+    'lainnya': 'SRT'
+  };
+  const code = jenisCode[jenis] || 'SRT';
+  const num = String(Math.floor(Math.random() * 100) + 1).padStart(3, '0');
+  return `${num}/KKG-G3/${code}/${month}/${year}`;
+}
+
+// Wrap content with Kop Surat and Signature
+async function wrapWithKopAndSignature(content, nomorSurat) {
+  // Ensure settings are loaded
+  await fetchLetterSettings();
+  const s = letterSettings;
+
+  // Format date now
+  const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  return `PEMERINTAH KABUPATEN ${s.kabupaten.toUpperCase()}
+DINAS PENDIDIKAN
+KELOMPOK KERJA GURU (KKG) GUGUS ${s.gugus}
+KECAMATAN ${s.kecamatan.toUpperCase()}
+Alamat: ${s.alamat_sekretariat}
+
+__________________________________________________________________________
+
+Nomor   : ${nomorSurat}
+Lampiran: -
+Perihal : ${selectedTemplate.nama}
+
+${content}
+
+${s.kecamatan}, ${today}
+Ketua KKG Gugus ${s.gugus},
+
+
+${s.nama_ketua}
+NIP. ${s.nip_ketua}`;
+}
+
+// New Generate Function
+window.generateFromTemplateNew = async function () {
+  if (!selectedTemplate) {
+    showToast('Pilih template terlebih dahulu', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('generate-from-template-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Membuat Surat...';
+
+  try {
+    // Collect variables
+    const variables = selectedTemplate.variables || [];
+    const data = {};
+
+    for (const v of variables) {
+      const input = document.getElementById(`var-${v}`);
+      if (input) {
+        let value = input.value.trim();
+        if (v.includes('tanggal') && value) {
+          const date = new Date(value);
+          value = date.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+        data[v] = value || `[${v}]`;
+      }
+    }
+
+    // Replace content
+    let content = selectedTemplate.konten;
+    for (const [key, value] of Object.entries(data)) {
+      content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+    }
+
+    // Generate nomor
+    const nomorSurat = generateTempNomorSurat(selectedTemplate.jenis);
+
+    // Wrap
+    const fullContent = await wrapWithKopAndSignature(content, nomorSurat);
+
+    // Store
+    currentSuratData = {
+      id: null,
+      nomor_surat: nomorSurat,
+      jenis_kegiatan: selectedTemplate.nama,
+      tanggal_kegiatan: data.tanggal || new Date().toISOString().split('T')[0],
+      isi_surat: fullContent,
+      template_id: selectedTemplate.id,
+      created_at: new Date().toISOString()
+    };
+
+    // Show
+    document.getElementById('surat-content').textContent = fullContent;
+    document.getElementById('surat-result').classList.remove('hidden');
+    document.getElementById('surat-result').scrollIntoView({ behavior: 'smooth' });
+
+    showToast('Surat berhasil dibuat!', 'success');
+  } catch (e) {
+    console.error('Error generation:', e);
+    showToast('Gagal membuat surat: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-file-alt mr-2"></i>Buat Surat dari Template';
+  }
 }

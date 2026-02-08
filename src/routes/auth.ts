@@ -25,6 +25,22 @@ type Bindings = { DB: D1Database };
 const auth = new Hono<{ Bindings: Bindings }>();
 
 // ============================================
+// Get CSRF Token (for SPA to get a fresh token)
+// ============================================
+auth.get('/csrf-token', (c) => {
+  const csrfToken = generateCSRFToken();
+  const isProduction = !c.req.url.includes('localhost');
+
+  // Set CSRF cookie
+  c.res.headers.append(
+    'Set-Cookie',
+    `csrf_token=${csrfToken}; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}${isProduction ? '; Secure' : ''}`
+  );
+
+  return successResponse(c, { csrf_token: csrfToken });
+});
+
+// ============================================
 // Login
 // ============================================
 auth.post('/login', rateLimitMiddleware(RATE_LIMITS.auth), async (c) => {
@@ -324,4 +340,177 @@ auth.post('/change-password', async (c) => {
   }
 });
 
+// ============================================
+// Forgot Password - Request Reset
+// ============================================
+auth.post('/forgot-password', rateLimitMiddleware(RATE_LIMITS.auth), async (c) => {
+  try {
+    const body = await c.req.json();
+    const email = body.email?.toLowerCase().trim();
+
+    if (!email) {
+      return Errors.validation(c, 'Email harus diisi');
+    }
+
+    // Find user
+    const user: any = await c.env.DB.prepare(
+      'SELECT id, nama, email FROM users WHERE email = ?'
+    ).bind(email).first();
+
+    // Always return success to prevent email enumeration
+    if (!user) {
+      logger.auth('forgot_password', undefined, { email, found: false });
+      return successResponse(c, null, 'Jika email terdaftar, Anda akan menerima link reset password.');
+    }
+
+    // Import email functions
+    const { generateResetToken, getResetTokenExpiry, sendEmail, getPasswordResetEmailTemplate } = await import('../lib/email');
+
+    // Generate reset token
+    const token = generateResetToken();
+    const expiresAt = getResetTokenExpiry();
+
+    // Invalidate existing tokens for this user
+    await c.env.DB.prepare(
+      'UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0'
+    ).bind(user.id).run();
+
+    // Save token to database
+    await c.env.DB.prepare(
+      'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)'
+    ).bind(user.id, token, expiresAt).run();
+
+    // Get email settings
+    const emailSettings = await c.env.DB.prepare(
+      "SELECT key, value FROM settings WHERE key IN ('email_provider', 'email_api_key', 'email_from')"
+    ).all();
+
+    const settings: any = {};
+    emailSettings.results?.forEach((row: any) => {
+      settings[row.key] = row.value;
+    });
+
+    // Build reset URL
+    const baseUrl = c.req.raw.url.split('/api')[0];
+    const resetUrl = `${baseUrl}/#/reset-password?token=${token}`;
+
+    // Send email if configured
+    if (settings.email_api_key) {
+      const emailTemplate = getPasswordResetEmailTemplate(resetUrl, user.nama);
+
+      await sendEmail(
+        {
+          provider: settings.email_provider || 'resend',
+          apiKey: settings.email_api_key,
+          from: settings.email_from || 'noreply@kkg-wanayasa.id'
+        },
+        {
+          to: user.email,
+          subject: 'Reset Password - Portal KKG Gugus 3 Wanayasa',
+          html: emailTemplate.html,
+          text: emailTemplate.text
+        }
+      );
+
+      logger.auth('forgot_password', user.id, { email: user.email, email_sent: true });
+    } else {
+      // If email not configured, log the token for development
+      logger.auth('forgot_password', user.id, {
+        email: user.email,
+        email_sent: false,
+        dev_reset_url: resetUrl
+      });
+      console.log(`[DEV] Password reset link for ${email}: ${resetUrl}`);
+    }
+
+    return successResponse(c, null, 'Jika email terdaftar, Anda akan menerima link reset password.');
+  } catch (e: any) {
+    logger.error('Forgot password error', e);
+    return Errors.internal(c);
+  }
+});
+
+// ============================================
+// Reset Password - Use Token
+// ============================================
+auth.post('/reset-password', rateLimitMiddleware(RATE_LIMITS.auth), async (c) => {
+  try {
+    const body = await c.req.json();
+    const { token, new_password } = body;
+
+    if (!token || !new_password) {
+      return Errors.validation(c, 'Token dan password baru harus diisi');
+    }
+
+    // Validate password strength
+    if (new_password.length < 8) {
+      return Errors.validation(c, 'Password minimal 8 karakter');
+    }
+
+    // Find valid token
+    const resetToken: any = await c.env.DB.prepare(`
+      SELECT prt.*, u.id as user_id, u.email 
+      FROM password_reset_tokens prt
+      JOIN users u ON prt.user_id = u.id
+      WHERE prt.token = ? AND prt.used = 0 AND prt.expires_at > datetime('now')
+    `).bind(token).first();
+
+    if (!resetToken) {
+      logger.auth('reset_password', undefined, { token: token.substring(0, 10) + '...', valid: false });
+      return c.json({
+        success: false,
+        error: {
+          code: ErrorCodes.INVALID_TOKEN,
+          message: 'Token tidak valid atau sudah kadaluarsa. Silakan minta link reset password baru.'
+        }
+      }, 400);
+    }
+
+    // Hash new password
+    const newHash = await hashPassword(new_password);
+
+    // Update password
+    await c.env.DB.prepare(
+      'UPDATE users SET password_hash = ?, updated_at = datetime("now") WHERE id = ?'
+    ).bind(newHash, resetToken.user_id).run();
+
+    // Mark token as used
+    await c.env.DB.prepare(
+      'UPDATE password_reset_tokens SET used = 1 WHERE token = ?'
+    ).bind(token).run();
+
+    // Invalidate all sessions for this user
+    await c.env.DB.prepare(
+      'DELETE FROM sessions WHERE user_id = ?'
+    ).bind(resetToken.user_id).run();
+
+    logger.auth('reset_password', resetToken.user_id, { success: true });
+
+    return successResponse(c, null, 'Password berhasil direset. Silakan login dengan password baru.');
+  } catch (e: any) {
+    logger.error('Reset password error', e);
+    return Errors.internal(c);
+  }
+});
+
+// ============================================
+// Verify Reset Token
+// ============================================
+auth.get('/verify-reset-token/:token', async (c) => {
+  try {
+    const token = c.req.param('token');
+
+    const resetToken: any = await c.env.DB.prepare(`
+      SELECT id FROM password_reset_tokens 
+      WHERE token = ? AND used = 0 AND expires_at > datetime('now')
+    `).bind(token).first();
+
+    return successResponse(c, { valid: !!resetToken });
+  } catch (e: any) {
+    logger.error('Verify reset token error', e);
+    return Errors.internal(c);
+  }
+});
+
 export default auth;
+

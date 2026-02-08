@@ -1,11 +1,22 @@
 import { Hono } from 'hono';
 import { getCurrentUser, getCookie, hashPassword, validatePassword } from '../lib/auth';
 import { successResponse, Errors, validateRequired } from '../lib/response';
+import {
+  createAuditLog,
+  getAuditLogs,
+  getAuditActionTypes,
+  getAuditEntityTypes,
+  getAuditStats,
+  cleanOldAuditLogs,
+  formatAuditAction
+} from '../lib/audit';
 import type { DashboardStats, Settings } from '../types';
 
-type Bindings = { DB: D1Database };
 
-const admin = new Hono<{ Bindings: Bindings }>();
+type Bindings = { DB: D1Database };
+type Variables = { user: any };
+
+const admin = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // Middleware: Check admin role
 const requireAdmin = async (c: any, next: () => Promise<void>) => {
@@ -59,13 +70,26 @@ admin.get('/dashboard', async (c) => {
 // Get settings
 admin.get('/settings', async (c) => {
   try {
-    const result = await c.env.DB.prepare(
-      "SELECT key, value FROM settings WHERE key IN ('mistral_api_key', 'nama_ketua', 'tahun_ajaran', 'alamat_sekretariat')"
-    ).all();
+    // Get all relevant settings
+    const settingsKeys = [
+      'mistral_api_key', 'nama_ketua', 'tahun_ajaran', 'alamat_sekretariat',
+      // New KKG Profile fields
+      'nama_kkg', 'kecamatan', 'kabupaten', 'provinsi', 'kode_pos',
+      'email_kkg', 'telepon_kkg', 'website_kkg',
+      'logo_url', 'kop_surat_url',
+      'nama_sekretaris', 'nama_bendahara',
+      'struktur_organisasi', 'visi_misi',
+      'npsn_sekolah_induk', 'nama_sekolah_induk'
+    ];
 
-    const settings: Settings = {};
+    const placeholders = settingsKeys.map(() => '?').join(',');
+    const result = await c.env.DB.prepare(
+      `SELECT key, value FROM settings WHERE key IN (${placeholders})`
+    ).bind(...settingsKeys).all();
+
+    const settings: any = {};
     result.results?.forEach((row: any) => {
-      (settings as any)[row.key] = row.value;
+      settings[row.key] = row.value;
     });
 
     // Mask API key for security
@@ -87,32 +111,131 @@ admin.get('/settings', async (c) => {
 admin.put('/settings', async (c) => {
   try {
     const body = await c.req.json();
-    const { mistral_api_key, nama_ketua, tahun_ajaran, alamat_sekretariat } = body;
+    const currentUser: any = c.get('user');
 
-    const updates = [
-      { key: 'nama_ketua', value: nama_ketua },
-      { key: 'tahun_ajaran', value: tahun_ajaran },
-      { key: 'alamat_sekretariat', value: alamat_sekretariat },
+    // All updatable settings
+    const allowedKeys = [
+      'nama_ketua', 'nip_ketua', 'tahun_ajaran', 'alamat_sekretariat',
+      'nama_kkg', 'gugus', 'kecamatan', 'kabupaten', 'provinsi', 'kode_pos',
+      'email_kkg', 'telepon_kkg', 'website_kkg',
+      'logo_url', 'kop_surat_url',
+      'nama_sekretaris', 'nama_bendahara',
+      'struktur_organisasi', 'visi_misi',
+      'npsn_sekolah_induk', 'nama_sekolah_induk'
     ];
 
-    // Only update API key if it's not masked
-    if (mistral_api_key && !mistral_api_key.includes('****')) {
-      updates.push({ key: 'mistral_api_key', value: mistral_api_key });
-    }
+    const updates: { key: string; value: string }[] = [];
 
-    for (const { key, value } of updates) {
-      if (value !== undefined) {
-        await c.env.DB.prepare(`
-          INSERT INTO settings (key, value, updated_at) 
-          VALUES (?, ?, datetime('now'))
-          ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')
-        `).bind(key, value || '', value || '').run();
+    // Collect all valid updates
+    for (const key of allowedKeys) {
+      if (body[key] !== undefined) {
+        updates.push({ key, value: body[key] || '' });
       }
     }
+
+    // Handle API key separately (only if not masked)
+    if (body.mistral_api_key && !body.mistral_api_key.includes('****')) {
+      updates.push({ key: 'mistral_api_key', value: body.mistral_api_key });
+    }
+
+    // Execute updates
+    for (const { key, value } of updates) {
+      await c.env.DB.prepare(`
+        INSERT INTO settings (key, value, updated_at) 
+        VALUES (?, ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')
+      `).bind(key, value, value).run();
+    }
+
+    // Audit log
+    await createAuditLog(c.env.DB, {
+      user_id: currentUser.id,
+      action: 'SETTINGS_UPDATE',
+      details: { updated_keys: updates.map(u => u.key) },
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
+      user_agent: c.req.header('User-Agent')
+    });
 
     return successResponse(c, null, 'Pengaturan berhasil disimpan');
   } catch (e: any) {
     console.error('Update settings error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Upload KKG Logo
+admin.post('/settings/logo', async (c) => {
+  try {
+    const currentUser: any = c.get('user');
+    const contentType = c.req.header('Content-Type') || '';
+
+    if (!contentType.includes('multipart/form-data')) {
+      return Errors.validation(c, 'Content-Type harus multipart/form-data');
+    }
+
+    const formData = await c.req.formData();
+    const file = formData.get('logo') as File;
+
+    if (!file) {
+      return Errors.validation(c, 'File logo tidak ditemukan');
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      return Errors.validation(c, 'Tipe file tidak didukung. Gunakan PNG, JPEG, GIF, atau WebP');
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      return Errors.validation(c, 'Ukuran file maksimal 2MB');
+    }
+
+    // Check if R2 bucket is available
+    const bucket = (c.env as any).BUCKET;
+    if (!bucket) {
+      // Fallback: store as base64 data URL
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const dataUrl = `data:${file.type};base64,${base64}`;
+
+      await c.env.DB.prepare(`
+        INSERT INTO settings (key, value, updated_at) 
+        VALUES ('logo_url', ?, datetime('now'))
+        ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')
+      `).bind(dataUrl, dataUrl).run();
+
+      return successResponse(c, { logo_url: dataUrl }, 'Logo berhasil diupload');
+    }
+
+    // Upload to R2
+    const key = `logos/kkg-logo-${Date.now()}.${file.name.split('.').pop()}`;
+    const arrayBuffer = await file.arrayBuffer();
+
+    await bucket.put(key, arrayBuffer, {
+      httpMetadata: { contentType: file.type }
+    });
+
+    // Save logo URL to settings
+    const logoUrl = `/api/files/${key}`;
+    await c.env.DB.prepare(`
+      INSERT INTO settings (key, value, updated_at) 
+      VALUES ('logo_url', ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')
+    `).bind(logoUrl, logoUrl).run();
+
+    // Audit log
+    await createAuditLog(c.env.DB, {
+      user_id: currentUser.id,
+      action: 'SETTINGS_UPDATE',
+      details: { action: 'upload_logo', file_name: file.name },
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
+      user_agent: c.req.header('User-Agent')
+    });
+
+    return successResponse(c, { logo_url: logoUrl }, 'Logo berhasil diupload');
+  } catch (e: any) {
+    console.error('Upload logo error:', e);
     return Errors.internal(c);
   }
 });
@@ -230,9 +353,299 @@ admin.delete('/users/:id', async (c) => {
 
     await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
 
+    // Log the action
+    await createAuditLog(c.env.DB, {
+      user_id: currentUser.id,
+      action: 'USER_DELETE',
+      entity_type: 'user',
+      entity_id: Number(id),
+      details: { deleted_user_id: id },
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
+      user_agent: c.req.header('User-Agent')
+    });
+
     return successResponse(c, null, 'User berhasil dihapus');
   } catch (e: any) {
     console.error('Delete user error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// ============================================
+// Audit Log Endpoints
+// ============================================
+
+// Get audit logs with filtering
+admin.get('/logs', async (c) => {
+  try {
+    const userId = c.req.query('user_id');
+    const action = c.req.query('action');
+    const entityType = c.req.query('entity_type');
+    const startDate = c.req.query('start_date');
+    const endDate = c.req.query('end_date');
+    const search = c.req.query('search');
+    const page = parseInt(c.req.query('page') || '1', 10);
+    const limit = parseInt(c.req.query('limit') || '50', 10);
+    const offset = (page - 1) * limit;
+
+    const { logs, total } = await getAuditLogs(c.env.DB, {
+      userId: userId ? parseInt(userId, 10) : undefined,
+      action: action || undefined,
+      entityType: entityType || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      search: search || undefined,
+      limit,
+      offset
+    });
+
+    return successResponse(c, {
+      logs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (e: any) {
+    console.error('Get audit logs error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Get audit log statistics
+admin.get('/logs/stats', async (c) => {
+  try {
+    const stats = await getAuditStats(c.env.DB);
+    return successResponse(c, stats);
+  } catch (e: any) {
+    console.error('Get audit stats error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Get available action types for filtering
+admin.get('/logs/actions', async (c) => {
+  try {
+    const actions = await getAuditActionTypes(c.env.DB);
+    return successResponse(c, actions.map(action => ({
+      value: action,
+      label: formatAuditAction(action)
+    })));
+  } catch (e: any) {
+    console.error('Get audit actions error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Get available entity types for filtering
+admin.get('/logs/entities', async (c) => {
+  try {
+    const entities = await getAuditEntityTypes(c.env.DB);
+    return successResponse(c, entities);
+  } catch (e: any) {
+    console.error('Get audit entities error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Clean old audit logs (retention)
+admin.post('/logs/cleanup', async (c) => {
+  try {
+    const { days_to_keep = 90 } = await c.req.json();
+    const deleted = await cleanOldAuditLogs(c.env.DB, days_to_keep);
+
+    const currentUser: any = c.get('user');
+    await createAuditLog(c.env.DB, {
+      user_id: currentUser.id,
+      action: 'ADMIN_ACTION',
+      details: { action: 'cleanup_audit_logs', days_to_keep, deleted_count: deleted },
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
+      user_agent: c.req.header('User-Agent')
+    });
+
+    return successResponse(c, { deleted }, `${deleted} log lama berhasil dihapus`);
+  } catch (e: any) {
+    console.error('Cleanup audit logs error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// ============================================
+// User Approval System
+// ============================================
+
+// Get pending users
+admin.get('/users/pending', async (c) => {
+  try {
+    const results = await c.env.DB.prepare(`
+      SELECT id, nama, email, nip, sekolah, role, created_at
+      FROM users
+      WHERE is_approved = 0 OR is_approved IS NULL
+      ORDER BY created_at DESC
+    `).all();
+
+    return successResponse(c, results.results);
+  } catch (e: any) {
+    console.error('Get pending users error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Approve user
+admin.post('/users/:id/approve', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const currentUser: any = c.get('user');
+
+    if (!id || isNaN(Number(id))) {
+      return Errors.validation(c, 'ID user tidak valid');
+    }
+
+    // Check if user exists and is pending
+    const user: any = await c.env.DB.prepare(
+      'SELECT id, nama, email, is_approved FROM users WHERE id = ?'
+    ).bind(id).first();
+
+    if (!user) {
+      return Errors.notFound(c, 'User');
+    }
+
+    if (user.is_approved === 1) {
+      return Errors.validation(c, 'User sudah disetujui sebelumnya');
+    }
+
+    // Approve user
+    await c.env.DB.prepare(`
+      UPDATE users 
+      SET is_approved = 1, approved_at = datetime('now'), approved_by = ?
+      WHERE id = ?
+    `).bind(currentUser.id, id).run();
+
+    // Audit log
+    await createAuditLog(c.env.DB, {
+      user_id: currentUser.id,
+      action: 'USER_APPROVE',
+      entity_type: 'users',
+      entity_id: Number(id),
+      details: { approved_user: user.nama, email: user.email },
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
+      user_agent: c.req.header('User-Agent')
+    });
+
+    return successResponse(c, { approved: true }, `User ${user.nama} berhasil disetujui`);
+  } catch (e: any) {
+    console.error('Approve user error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Reject user (delete)
+admin.post('/users/:id/reject', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const { reason } = await c.req.json();
+    const currentUser: any = c.get('user');
+
+    if (!id || isNaN(Number(id))) {
+      return Errors.validation(c, 'ID user tidak valid');
+    }
+
+    // Check if user exists
+    const user: any = await c.env.DB.prepare(
+      'SELECT id, nama, email FROM users WHERE id = ?'
+    ).bind(id).first();
+
+    if (!user) {
+      return Errors.notFound(c, 'User');
+    }
+
+    // Can't reject admin
+    const userDetail: any = await c.env.DB.prepare(
+      'SELECT role FROM users WHERE id = ?'
+    ).bind(id).first();
+
+    if (userDetail?.role === 'admin') {
+      return Errors.forbidden(c, 'Tidak dapat menolak user admin');
+    }
+
+    // Delete user
+    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+
+    // Audit log
+    await createAuditLog(c.env.DB, {
+      user_id: currentUser.id,
+      action: 'USER_REJECT',
+      entity_type: 'users',
+      entity_id: Number(id),
+      details: { rejected_user: user.nama, email: user.email, reason },
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
+      user_agent: c.req.header('User-Agent')
+    });
+
+    return successResponse(c, { rejected: true }, `User ${user.nama} berhasil ditolak`);
+  } catch (e: any) {
+    console.error('Reject user error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Bulk approve users
+admin.post('/users/bulk-approve', async (c) => {
+  try {
+    const { user_ids } = await c.req.json();
+    const currentUser: any = c.get('user');
+
+    if (!Array.isArray(user_ids) || user_ids.length === 0) {
+      return Errors.validation(c, 'Daftar user ID harus diisi');
+    }
+
+    let approved = 0;
+    for (const userId of user_ids) {
+      try {
+        await c.env.DB.prepare(`
+          UPDATE users 
+          SET is_approved = 1, approved_at = datetime('now'), approved_by = ?
+          WHERE id = ? AND (is_approved = 0 OR is_approved IS NULL)
+        `).bind(currentUser.id, userId).run();
+        approved++;
+      } catch (e) {
+        console.warn(`Failed to approve user ${userId}:`, e);
+      }
+    }
+
+    // Audit log
+    await createAuditLog(c.env.DB, {
+      user_id: currentUser.id,
+      action: 'USER_BULK_APPROVE',
+      details: { approved_count: approved, user_ids },
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
+      user_agent: c.req.header('User-Agent')
+    });
+
+    return successResponse(c, { approved }, `${approved} user berhasil disetujui`);
+  } catch (e: any) {
+    console.error('Bulk approve error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Get user approval stats
+admin.get('/users/approval-stats', async (c) => {
+  try {
+    const stats = await c.env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_users,
+        SUM(CASE WHEN is_approved = 1 THEN 1 ELSE 0 END) as approved,
+        SUM(CASE WHEN is_approved = 0 OR is_approved IS NULL THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN DATE(created_at) = DATE('now') THEN 1 ELSE 0 END) as registered_today
+      FROM users
+    `).first();
+
+    return successResponse(c, stats);
+  } catch (e: any) {
+    console.error('Get approval stats error:', e);
     return Errors.internal(c);
   }
 });

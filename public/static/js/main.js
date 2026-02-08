@@ -8,9 +8,9 @@ import { showToast, showLoading, hideLoading, confirm } from './utils.js';
 // Components
 import { renderNavbar, renderFooter, toggleMobileMenu } from './components.js';
 
-// Theme & Accessibility - temporarily disabled for debugging
-// import { initTheme, toggleTheme, renderThemeToggle } from './theme.js';
-// import { initA11y, announce, renderSkipLinks } from './a11y.js';
+// Theme & Accessibility
+import { initTheme, toggleTheme, renderThemeToggle } from './theme.js';
+import { initA11y, announce, renderSkipLinks } from './a11y.js';
 
 // Pages
 import { renderHome } from './pages/home.js';
@@ -24,13 +24,15 @@ import { renderGuru } from './pages/guru.js';
 import { renderForum } from './pages/forum.js';
 import { renderPengumuman } from './pages/pengumuman.js';
 import { renderAdmin } from './pages/admin.js';
+import { renderResetPassword, initResetPassword } from './pages/reset-password.js';
+import { renderKalender, initKalender } from './pages/kalender.js';
 
 // Global exports for inline HTML onclick handlers
 window.navigate = navigate;
 window.toggleMobileMenu = toggleMobileMenu;
 window.showToast = showToast;
 window.confirm = confirm;
-// window.toggleTheme = toggleTheme; // Temporarily disabled
+window.toggleTheme = toggleTheme;
 
 // Initialize database (first-time setup)
 window.initDb = async function () {
@@ -62,6 +64,8 @@ const pages = {
     forum: renderForum,
     pengumuman: renderPengumuman,
     admin: renderAdmin,
+    kalender: renderKalender,
+    'reset-password': renderResetPassword,
 };
 
 // Protected pages (require authentication)
@@ -111,9 +115,15 @@ async function render() {
             guru: 'Direktori Guru',
             forum: 'Forum Diskusi',
             pengumuman: 'Pengumuman',
-            admin: 'Panel Admin'
+            admin: 'Panel Admin',
+            'reset-password': 'Reset Password'
         };
         // announce disabled
+
+        // Initialize page-specific logic
+        if (page === 'reset-password') {
+            setTimeout(() => initResetPassword(), 100);
+        }
 
     } catch (e) {
         console.error('Render error:', e);
@@ -134,7 +144,8 @@ async function render() {
     }
 
     // Build final HTML
-    const isAuthPage = page === 'login';
+    const isAuthPage = page === 'login' || page === 'reset-password';
+
 
     if (isAuthPage) {
         // Auth pages have their own layout
@@ -186,10 +197,10 @@ async function registerServiceWorker() {
 async function init() {
     console.log('🚀 Initializing KKG Portal...');
 
-    // Theme, A11y, and PWA temporarily disabled for debugging
-    // initTheme();
-    // initA11y();
-    // registerServiceWorker();
+    // Initialize Theme, Accessibility, and PWA
+    initTheme();
+    initA11y();
+    registerServiceWorker();
 
     // Check existing session
     try {
@@ -201,6 +212,17 @@ async function init() {
     } catch (e) {
         // Not logged in or session expired, that's fine
         console.log('ℹ️ No active session');
+    }
+
+    // Initialize CSRF token if not present
+    const csrfCookie = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
+    if (!csrfCookie) {
+        try {
+            await fetch('/api/auth/csrf-token', { credentials: 'include' });
+            console.log('✅ CSRF token initialized');
+        } catch (e) {
+            console.warn('⚠️ Failed to initialize CSRF token');
+        }
     }
 
     // Parse initial URL

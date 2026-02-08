@@ -138,7 +138,7 @@ export const logger = {
     /**
      * Log authentication event
      */
-    auth(event: 'login' | 'logout' | 'register' | 'password_change' | 'login_failed', userId?: number, context?: LogContext) {
+    auth(event: 'login' | 'logout' | 'register' | 'password_change' | 'login_failed' | 'forgot_password' | 'reset_password', userId?: number, context?: LogContext) {
         const level: LogLevel = event === 'login_failed' ? 'warn' : 'info';
         console.log(formatLog(createEntry(level, `[AUTH] ${event}`, { userId, ...context })));
     },

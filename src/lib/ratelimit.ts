@@ -22,28 +22,28 @@ export interface RateLimitConfig {
  * Default configurations for different endpoint types
  */
 export const RATE_LIMITS = {
-    // Very strict for auth endpoints
+    // Auth endpoints (increased for dev)
     auth: {
         windowMs: 15 * 60 * 1000, // 15 minutes
-        maxRequests: 5,           // 5 attempts
+        maxRequests: 50,          // 50 attempts (dev-friendly)
         keyPrefix: 'auth'
     },
     // Strict for AI generation (expensive operations)
     ai: {
         windowMs: 60 * 60 * 1000, // 1 hour
-        maxRequests: 10,          // 10 requests
+        maxRequests: 30,          // 30 requests (increased)
         keyPrefix: 'ai'
     },
-    // Moderate for general API
+    // General API (increased for dev)
     api: {
         windowMs: 60 * 1000,      // 1 minute
-        maxRequests: 60,          // 60 requests
+        maxRequests: 500,         // 500 requests (dev-friendly)
         keyPrefix: 'api'
     },
     // Lenient for read operations
     read: {
         windowMs: 60 * 1000,      // 1 minute
-        maxRequests: 200,         // 200 requests
+        maxRequests: 500,         // 500 requests
         keyPrefix: 'read'
     }
 };

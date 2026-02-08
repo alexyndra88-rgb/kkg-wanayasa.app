@@ -5,6 +5,27 @@ import { state } from './state.js';
 import { showToast } from './utils.js';
 
 const API_BASE = '/api';
+let csrfRetryCount = 0;
+const MAX_CSRF_RETRIES = 1;
+
+/**
+ * Refresh CSRF token from server
+ */
+async function refreshCsrfToken() {
+    try {
+        const response = await fetch(`${API_BASE}/auth/csrf-token`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+        if (response.ok) {
+            const data = await response.json();
+            return data.data?.csrf_token || null;
+        }
+    } catch (e) {
+        console.error('Failed to refresh CSRF token:', e);
+    }
+    return null;
+}
 
 /**
  * Standard API request wrapper
@@ -58,6 +79,19 @@ export async function api(path, options = {}) {
 
         // Parse JSON response
         const data = await response.json();
+
+        // Handle CSRF errors - retry once with fresh token
+        if (response.status === 403 && (data.error?.code === 'CSRF_MISSING' || data.error?.code === 'CSRF_INVALID')) {
+            if (csrfRetryCount < MAX_CSRF_RETRIES) {
+                csrfRetryCount++;
+                console.log('CSRF token invalid, refreshing...');
+                await refreshCsrfToken();
+                csrfRetryCount = 0;
+                // Retry the request with fresh token
+                return api(path, options);
+            }
+            csrfRetryCount = 0;
+        }
 
         // Handle standardized error responses
         if (!response.ok || data.success === false) {

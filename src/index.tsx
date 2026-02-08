@@ -12,11 +12,14 @@ import materiRoutes from './routes/materi';
 import adminRoutes from './routes/admin';
 import filesRoutes from './routes/files';
 import dashboardRoutes from './routes/dashboard';
+import calendarRoutes from './routes/calendar';
+import templatesRoutes from './routes/templates';
 import { renderHTML } from './templates/layout';
 import { rateLimitMiddleware, RATE_LIMITS } from './lib/ratelimit';
 import { successResponse, Errors } from './lib/response';
 import { hashPassword } from './lib/auth';
 import { loggingMiddleware, logger } from './lib/logger';
+import { csrfMiddleware, getOrCreateCSRFToken } from './lib/csrf';
 import type { R2Bucket } from './lib/upload';
 
 type Bindings = {
@@ -54,6 +57,9 @@ app.use('/api/*', cors({
 // General rate limiting for all API routes
 app.use('/api/*', rateLimitMiddleware(RATE_LIMITS.api));
 
+// CSRF Protection Middleware (validates token on POST/PUT/DELETE)
+app.use('/api/*', csrfMiddleware());
+
 // API Routes
 app.route('/api/auth', authRoutes);
 app.route('/api/surat', suratRoutes);
@@ -66,6 +72,8 @@ app.route('/api/materi', materiRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/files', filesRoutes);
 app.route('/api/dashboard', dashboardRoutes);
+app.route('/api/calendar', calendarRoutes);
+app.route('/api/templates', templatesRoutes);
 
 // Health check endpoint
 app.get('/api/health', (c) => {
@@ -161,6 +169,21 @@ CREATE INDEX IF NOT EXISTS idx_materi_kategori ON materi(kategori);
 CREATE INDEX IF NOT EXISTS idx_forum_threads_user ON forum_threads(user_id);
 CREATE INDEX IF NOT EXISTS idx_forum_replies_thread ON forum_replies(thread_id);
 CREATE INDEX IF NOT EXISTS idx_pengumuman_pinned ON pengumuman(is_pinned);
+CREATE TABLE IF NOT EXISTS surat_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nama TEXT NOT NULL,
+  jenis TEXT NOT NULL,
+  deskripsi TEXT,
+  konten TEXT NOT NULL,
+  variables TEXT,
+  is_active INTEGER DEFAULT 1,
+  created_by INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_templates_jenis ON surat_templates(jenis);
+CREATE INDEX IF NOT EXISTS idx_templates_active ON surat_templates(is_active);
 `;
     const stmts = schema.split(';').filter(s => s.trim());
     for (const stmt of stmts) {
@@ -210,6 +233,116 @@ CREATE INDEX IF NOT EXISTS idx_pengumuman_pinned ON pengumuman(is_pinned);
       VALUES (1, 'Sharing Best Practice: Pembelajaran Diferensiasi di SD', 'Saya ingin berbagi pengalaman tentang penerapan pembelajaran diferensiasi di kelas saya. Bagaimana pengalaman rekan-rekan?', 'best-practice', 2, 1)`).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO forum_replies (id, thread_id, user_id, isi)
       VALUES (1, 1, 3, 'Saya sudah mencoba pembelajaran diferensiasi dengan membagi siswa berdasarkan gaya belajar. Hasilnya cukup positif!')`).run();
+
+    // Seed formal letter templates
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO surat_templates (id, nama, jenis, deskripsi, konten, variables, is_active, created_by)
+      VALUES (1, 'Undangan Rapat Rutin KKG', 'undangan', 'Template undangan untuk rapat rutin bulanan KKG Gugus 3 Wanayasa',
+'Dengan hormat,
+
+Sehubungan dengan agenda kegiatan Kelompok Kerja Guru (KKG) Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta, dengan ini kami mengundang Bapak/Ibu Guru untuk menghadiri:
+
+Hari/Tanggal  : {{tanggal}}
+Waktu         : {{waktu}}
+Tempat        : {{tempat}}
+Acara         : {{acara}}
+
+Mengingat pentingnya acara ini, kami mohon kehadiran Bapak/Ibu tepat pada waktunya. Dimohon untuk membawa berkas-berkas yang diperlukan.
+
+Demikian undangan ini kami sampaikan. Atas perhatian dan kehadirannya, kami ucapkan terima kasih.', '["tanggal", "waktu", "tempat", "acara"]', 1, 1)`).run();
+
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO surat_templates (id, nama, jenis, deskripsi, konten, variables, is_active, created_by)
+      VALUES (2, 'Undangan Workshop/Pelatihan', 'undangan', 'Template undangan untuk workshop, pelatihan, atau seminar KKG',
+'Dengan hormat,
+
+Dalam rangka meningkatkan kompetensi dan profesionalisme guru di lingkungan KKG Gugus 3 Kecamatan Wanayasa, kami akan menyelenggarakan:
+
+Kegiatan      : {{nama_kegiatan}}
+Tema          : {{tema}}
+Hari/Tanggal  : {{tanggal}}
+Waktu         : {{waktu}}
+Tempat        : {{tempat}}
+Narasumber    : {{narasumber}}
+
+Sehubungan dengan hal tersebut, kami mengundang Bapak/Ibu Guru untuk berpartisipasi dalam kegiatan dimaksud.
+
+Peserta diwajibkan untuk:
+1. Hadir tepat waktu
+2. Membawa laptop/gadget (jika diperlukan)
+3. Mengikuti kegiatan sampai selesai
+
+Demikian undangan ini kami sampaikan. Atas perhatian dan partisipasinya, kami ucapkan terima kasih.', '["nama_kegiatan", "tema", "tanggal", "waktu", "tempat", "narasumber"]', 1, 1)`).run();
+
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO surat_templates (id, nama, jenis, deskripsi, konten, variables, is_active, created_by)
+      VALUES (3, 'Surat Tugas Kegiatan', 'tugas', 'Template surat tugas untuk menugaskan guru dalam kegiatan resmi',
+'Yang bertanda tangan di bawah ini, Ketua KKG Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta, dengan ini menugaskan kepada:
+
+Nama          : {{nama_guru}}
+NIP           : {{nip}}
+Pangkat/Gol.  : {{pangkat}}
+Jabatan       : {{jabatan}}
+Unit Kerja    : {{unit_kerja}}
+
+Untuk melaksanakan tugas sebagai {{tugas}} dalam kegiatan:
+
+Nama Kegiatan : {{nama_kegiatan}}
+Hari/Tanggal  : {{tanggal}}
+Waktu         : {{waktu}}
+Tempat        : {{tempat}}
+
+Demikian surat tugas ini dibuat untuk dapat dipergunakan sebagaimana mestinya.', '["nama_guru", "nip", "pangkat", "jabatan", "unit_kerja", "tugas", "nama_kegiatan", "tanggal", "waktu", "tempat"]', 1, 1)`).run();
+
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO surat_templates (id, nama, jenis, deskripsi, konten, variables, is_active, created_by)
+      VALUES (4, 'Surat Keterangan Aktif Anggota', 'keterangan', 'Template surat keterangan keaktifan anggota KKG',
+'Yang bertanda tangan di bawah ini, Ketua KKG Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta, menerangkan bahwa:
+
+Nama          : {{nama_guru}}
+NIP           : {{nip}}
+Pangkat/Gol.  : {{pangkat}}
+Jabatan       : {{jabatan}}
+Unit Kerja    : {{unit_kerja}}
+
+Adalah benar-benar anggota aktif Kelompok Kerja Guru (KKG) Gugus 3 Kecamatan Wanayasa dan telah mengikuti kegiatan-kegiatan yang diselenggarakan oleh KKG sejak tahun {{tahun_bergabung}}.
+
+Surat keterangan ini dibuat untuk keperluan {{keperluan}}.
+
+Demikian surat keterangan ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.', '["nama_guru", "nip", "pangkat", "jabatan", "unit_kerja", "tahun_bergabung", "keperluan"]', 1, 1)`).run();
+
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO surat_templates (id, nama, jenis, deskripsi, konten, variables, is_active, created_by)
+      VALUES (5, 'Surat Edaran Umum', 'edaran', 'Template surat edaran untuk pemberitahuan umum kepada anggota KKG',
+'Kepada Yth.
+{{tujuan}}
+di Tempat
+
+Dengan hormat,
+
+Berdasarkan {{dasar_surat}}, dengan ini kami sampaikan hal-hal sebagai berikut:
+
+{{isi_edaran}}
+
+Demikian surat edaran ini kami sampaikan. Atas perhatian dan kerjasamanya, kami ucapkan terima kasih.', '["tujuan", "dasar_surat", "isi_edaran"]', 1, 1)`).run();
+
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO surat_templates (id, nama, jenis, deskripsi, konten, variables, is_active, created_by)
+      VALUES (6, 'Permohonan Narasumber', 'permohonan', 'Template surat permohonan narasumber untuk kegiatan KKG',
+'Kepada Yth.
+{{nama_tujuan}}
+{{jabatan_tujuan}}
+di {{alamat_tujuan}}
+
+Dengan hormat,
+
+Dalam rangka meningkatkan kompetensi dan profesionalisme guru di lingkungan KKG Gugus 3 Kecamatan Wanayasa, kami bermaksud menyelenggarakan kegiatan:
+
+Nama Kegiatan : {{nama_kegiatan}}
+Tema          : {{tema}}
+Hari/Tanggal  : {{tanggal}}
+Waktu         : {{waktu}}
+Tempat        : {{tempat}}
+
+Sehubungan dengan hal tersebut, kami mohon kesediaan Bapak/Ibu untuk menjadi narasumber dalam kegiatan dimaksud dengan materi: {{materi}}.
+
+Besar harapan kami atas kesediaan Bapak/Ibu dan kami siap menyediakan akomodasi yang diperlukan.
+
+Demikian permohonan ini kami sampaikan. Atas perhatian dan kesediaannya, kami ucapkan terima kasih.', '["nama_tujuan", "jabatan_tujuan", "alamat_tujuan", "nama_kegiatan", "tema", "tanggal", "waktu", "tempat", "materi"]', 1, 1)`).run();
 
     return successResponse(c, null, 'Database berhasil diinisialisasi!');
   } catch (e: any) {

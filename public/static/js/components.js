@@ -15,6 +15,7 @@ export function renderNavbar() {
     { page: 'surat', label: 'Generator Surat', icon: 'fa-file-alt', auth: true },
     { page: 'proker', label: 'Program Kerja', icon: 'fa-tasks', auth: true },
     { page: 'absensi', label: 'Absensi', icon: 'fa-clipboard-check', auth: true },
+    { page: 'kalender', label: 'Kalender', icon: 'fa-calendar-alt', public: true },
     { page: 'materi', label: 'Materi', icon: 'fa-book-open', public: true },
     { page: 'guru', label: 'Direktori Guru', icon: 'fa-users', public: true },
     { page: 'forum', label: 'Forum', icon: 'fa-comments', public: true },
@@ -94,6 +95,17 @@ export function renderNavbar() {
                 <i class="fas fa-sign-in-alt mr-2"></i>Masuk
               </button>
             `}
+            
+            <!-- Theme Toggle Button -->
+            <button 
+              onclick="toggleTheme()"
+              class="bg-white/10 p-2 rounded-xl hover:bg-white/20 transition-colors"
+              aria-label="Toggle dark mode"
+              title="Toggle dark mode"
+            >
+              <i class="fas fa-moon text-white dark:hidden"></i>
+              <i class="fas fa-sun text-yellow-400 hidden dark:inline"></i>
+            </button>
             
             <!-- Mobile Menu Button -->
             <button 
