@@ -1,93 +1,240 @@
 import { Hono } from 'hono';
-import { getCurrentUser, getCookie, hashPassword } from '../lib/auth';
+import { getCurrentUser, getCookie, hashPassword, validatePassword } from '../lib/auth';
+import { successResponse, Errors, validateRequired } from '../lib/response';
+import type { DashboardStats, Settings } from '../types';
 
 type Bindings = { DB: D1Database };
 
 const admin = new Hono<{ Bindings: Bindings }>();
 
-// Middleware: check admin
-admin.use('*', async (c, next) => {
+// Middleware: Check admin role
+const requireAdmin = async (c: any, next: () => Promise<void>) => {
   const sessionId = getCookie(c.req.header('Cookie'), 'session');
   const user: any = await getCurrentUser(c.env.DB, sessionId);
-  if (!user || user.role !== 'admin') {
-    return c.json({ error: 'Akses ditolak. Hanya admin.' }, 403);
+
+  if (!user) {
+    return Errors.unauthorized(c);
   }
-  c.set('user' as any, user);
+
+  if (user.role !== 'admin') {
+    return Errors.forbidden(c, 'Halaman ini hanya untuk admin');
+  }
+
+  c.set('user', user);
   await next();
+};
+
+admin.use('/*', requireAdmin);
+
+// Dashboard stats
+admin.get('/dashboard', async (c) => {
+  try {
+    const [guru, surat, proker, kegiatan, materi, pengumuman, threads] = await Promise.all([
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM users').first(),
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM surat_undangan').first(),
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM program_kerja').first(),
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM kegiatan').first(),
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM materi').first(),
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM pengumuman').first(),
+      c.env.DB.prepare('SELECT COUNT(*) as cnt FROM forum_threads').first(),
+    ]) as any[];
+
+    const stats: DashboardStats = {
+      total_guru: guru?.cnt || 0,
+      total_surat: surat?.cnt || 0,
+      total_proker: proker?.cnt || 0,
+      total_kegiatan: kegiatan?.cnt || 0,
+      total_materi: materi?.cnt || 0,
+      total_pengumuman: pengumuman?.cnt || 0,
+      total_threads: threads?.cnt || 0,
+    };
+
+    return successResponse(c, stats);
+  } catch (e: any) {
+    console.error('Get dashboard error:', e);
+    return Errors.internal(c);
+  }
 });
 
 // Get settings
 admin.get('/settings', async (c) => {
-  const results = await c.env.DB.prepare('SELECT key, value FROM settings').all();
-  const settings: Record<string, string> = {};
-  results.results.forEach((r: any) => {
+  try {
+    const result = await c.env.DB.prepare(
+      "SELECT key, value FROM settings WHERE key IN ('mistral_api_key', 'nama_ketua', 'tahun_ajaran', 'alamat_sekretariat')"
+    ).all();
+
+    const settings: Settings = {};
+    result.results?.forEach((row: any) => {
+      (settings as any)[row.key] = row.value;
+    });
+
     // Mask API key for security
-    if (r.key === 'mistral_api_key' && r.value) {
-      settings[r.key] = r.value.substring(0, 8) + '...' + (r.value.length > 12 ? r.value.substring(r.value.length - 4) : '');
-    } else {
-      settings[r.key] = r.value;
+    if (settings.mistral_api_key) {
+      const key = settings.mistral_api_key;
+      settings.mistral_api_key = key.length > 8
+        ? key.substring(0, 4) + '****' + key.substring(key.length - 4)
+        : '****';
     }
-  });
-  return c.json({ data: settings });
+
+    return successResponse(c, settings);
+  } catch (e: any) {
+    console.error('Get settings error:', e);
+    return Errors.internal(c);
+  }
 });
 
 // Update settings
 admin.put('/settings', async (c) => {
-  const body = await c.req.json();
-  
-  for (const [key, value] of Object.entries(body)) {
-    await c.env.DB.prepare(
-      'INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)'
-    ).bind(key, value as string).run();
-  }
+  try {
+    const body = await c.req.json();
+    const { mistral_api_key, nama_ketua, tahun_ajaran, alamat_sekretariat } = body;
 
-  return c.json({ success: true, message: 'Pengaturan berhasil disimpan' });
+    const updates = [
+      { key: 'nama_ketua', value: nama_ketua },
+      { key: 'tahun_ajaran', value: tahun_ajaran },
+      { key: 'alamat_sekretariat', value: alamat_sekretariat },
+    ];
+
+    // Only update API key if it's not masked
+    if (mistral_api_key && !mistral_api_key.includes('****')) {
+      updates.push({ key: 'mistral_api_key', value: mistral_api_key });
+    }
+
+    for (const { key, value } of updates) {
+      if (value !== undefined) {
+        await c.env.DB.prepare(`
+          INSERT INTO settings (key, value, updated_at) 
+          VALUES (?, ?, datetime('now'))
+          ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')
+        `).bind(key, value || '', value || '').run();
+      }
+    }
+
+    return successResponse(c, null, 'Pengaturan berhasil disimpan');
+  } catch (e: any) {
+    console.error('Update settings error:', e);
+    return Errors.internal(c);
+  }
 });
 
 // Get all users
 admin.get('/users', async (c) => {
-  const results = await c.env.DB.prepare(
-    'SELECT id, nama, email, role, nip, sekolah, mata_pelajaran, no_hp, created_at FROM users ORDER BY nama ASC'
-  ).all();
-  return c.json({ data: results.results });
+  try {
+    const search = c.req.query('search') || '';
+
+    let query = `
+      SELECT id, nama, email, role, nip, sekolah, mata_pelajaran, no_hp, created_at
+      FROM users
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (search) {
+      query += ` AND (nama LIKE ? OR email LIKE ? OR nip LIKE ?)`;
+      const term = `%${search}%`;
+      params.push(term, term, term);
+    }
+
+    query += ` ORDER BY nama ASC LIMIT 200`;
+
+    const stmt = c.env.DB.prepare(query);
+    const results = params.length > 0
+      ? await stmt.bind(...params).all()
+      : await stmt.all();
+
+    return successResponse(c, results.results);
+  } catch (e: any) {
+    console.error('Get users error:', e);
+    return Errors.internal(c);
+  }
 });
 
 // Reset user password
 admin.post('/users/:id/reset-password', async (c) => {
-  const id = c.req.param('id');
-  const { new_password } = await c.req.json();
-  
-  if (!new_password || new_password.length < 6) {
-    return c.json({ error: 'Password minimal 6 karakter' }, 400);
+  try {
+    const id = c.req.param('id');
+    const { new_password } = await c.req.json();
+
+    if (!id || isNaN(Number(id))) {
+      return Errors.validation(c, 'ID user tidak valid');
+    }
+
+    if (!new_password) {
+      return Errors.validation(c, 'Password baru harus diisi');
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(new_password);
+    if (!passwordValidation.valid) {
+      return Errors.validation(c, passwordValidation.message);
+    }
+
+    // Check user exists
+    const user: any = await c.env.DB.prepare(
+      'SELECT id FROM users WHERE id = ?'
+    ).bind(id).first();
+
+    if (!user) {
+      return Errors.notFound(c, 'User');
+    }
+
+    // Hash and update password
+    const newHash = await hashPassword(new_password);
+    await c.env.DB.prepare(`
+      UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?
+    `).bind(newHash, id).run();
+
+    // Invalidate all sessions for this user
+    await c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id).run();
+
+    return successResponse(c, null, 'Password berhasil direset');
+  } catch (e: any) {
+    console.error('Reset password error:', e);
+    return Errors.internal(c);
   }
-
-  const hash = await hashPassword(new_password);
-  await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, id).run();
-
-  return c.json({ success: true, message: 'Password berhasil direset' });
 });
 
-// Dashboard stats
-admin.get('/dashboard', async (c) => {
-  const userCount: any = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM users').first();
-  const suratCount: any = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM surat_undangan').first();
-  const prokerCount: any = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM program_kerja').first();
-  const kegiatanCount: any = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM kegiatan').first();
-  const materiCount: any = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM materi').first();
-  const threadCount: any = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM forum_threads').first();
-  const pengumumanCount: any = await c.env.DB.prepare('SELECT COUNT(*) as cnt FROM pengumuman').first();
+// Delete user (with safeguards)
+admin.delete('/users/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const currentUser = c.get('user');
 
-  return c.json({
-    data: {
-      total_guru: userCount.cnt,
-      total_surat: suratCount.cnt,
-      total_proker: prokerCount.cnt,
-      total_kegiatan: kegiatanCount.cnt,
-      total_materi: materiCount.cnt,
-      total_diskusi: threadCount.cnt,
-      total_pengumuman: pengumumanCount.cnt,
+    if (!id || isNaN(Number(id))) {
+      return Errors.validation(c, 'ID user tidak valid');
     }
-  });
+
+    // Prevent self-deletion
+    if (Number(id) === currentUser.id) {
+      return Errors.validation(c, 'Anda tidak dapat menghapus akun sendiri');
+    }
+
+    const user: any = await c.env.DB.prepare(
+      'SELECT id, role FROM users WHERE id = ?'
+    ).bind(id).first();
+
+    if (!user) {
+      return Errors.notFound(c, 'User');
+    }
+
+    // Prevent deleting last admin
+    if (user.role === 'admin') {
+      const adminCount: any = await c.env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM users WHERE role = 'admin'"
+      ).first();
+
+      if (adminCount.cnt <= 1) {
+        return Errors.validation(c, 'Tidak dapat menghapus admin terakhir');
+      }
+    }
+
+    await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+
+    return successResponse(c, null, 'User berhasil dihapus');
+  } catch (e: any) {
+    console.error('Delete user error:', e);
+    return Errors.internal(c);
+  }
 });
 
 export default admin;

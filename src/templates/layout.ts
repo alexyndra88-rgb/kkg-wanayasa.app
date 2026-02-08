@@ -8,6 +8,9 @@ export function renderHTML(): string {
   <meta name="description" content="Portal Digital Kelompok Kerja Guru (KKG) Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css" rel="stylesheet">
+  <!-- DOCX Export Libraries -->
+  <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -49,7 +52,7 @@ export function renderHTML(): string {
 <body class="bg-gray-50 min-h-screen">
   <div id="app"></div>
   <div id="toast-container"></div>
-  <script src="/static/app.js"></script>
+  <script type="module" src="/static/js/main.js"></script>
 </body>
 </html>`;
 }

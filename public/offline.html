@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - Portal KKG Gugus 3 Wanayasa</title>
+  <meta name="theme-color" content="#1e40af">
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1e3a8a 0%, #4c1d95 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      color: white;
+    }
+    
+    .container {
+      text-align: center;
+      max-width: 400px;
+    }
+    
+    .icon {
+      font-size: 5rem;
+      margin-bottom: 1.5rem;
+      opacity: 0.9;
+    }
+    
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.75rem;
+      font-weight: 700;
+    }
+    
+    p {
+      opacity: 0.9;
+      line-height: 1.6;
+      margin-bottom: 1.5rem;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: white;
+      color: #1e3a8a;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+      border: none;
+      font-size: 1rem;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    .btn:active {
+      transform: translateY(0);
+    }
+    
+    .status {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 0.75rem;
+      font-size: 0.875rem;
+    }
+    
+    .status.online {
+      background: rgba(34, 197, 94, 0.2);
+    }
+    
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      margin-right: 0.5rem;
+      animation: pulse 2s infinite;
+    }
+    
+    .status.online .dot {
+      background: #22c55e;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .tips {
+      margin-top: 2rem;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1.25rem;
+      border-radius: 0.75rem;
+    }
+    
+    .tips h3 {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      opacity: 0.9;
+    }
+    
+    .tips ul {
+      list-style: none;
+      font-size: 0.813rem;
+      opacity: 0.8;
+    }
+    
+    .tips li {
+      padding: 0.25rem 0;
+    }
+    
+    .tips li::before {
+      content: "•";
+      margin-right: 0.5rem;
+      color: #fbbf24;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📡</div>
+    <h1>Anda Sedang Offline</h1>
+    <p>
+      Sepertinya koneksi internet Anda terputus. 
+      Beberapa fitur mungkin tidak tersedia saat offline.
+    </p>
+    
+    <button class="btn" onclick="location.reload()">
+      🔄 Coba Lagi
+    </button>
+    
+    <div id="status" class="status">
+      <span class="dot"></span>
+      <span id="status-text">Tidak ada koneksi internet</span>
+    </div>
+    
+    <div class="tips">
+      <h3>💡 Tips saat offline:</h3>
+      <ul>
+        <li>Periksa koneksi WiFi atau data seluler Anda</li>
+        <li>Coba mode pesawat on/off</li>
+        <li>Halaman yang pernah dikunjungi mungkin tersedia offline</li>
+        <li>Data yang belum tersimpan akan disinkronkan saat online</li>
+      </ul>
+    </div>
+  </div>
+  
+  <script>
+    // Check online status
+    function updateStatus() {
+      const statusEl = document.getElementById('status');
+      const statusText = document.getElementById('status-text');
+      
+      if (navigator.onLine) {
+        statusEl.classList.add('online');
+        statusText.textContent = 'Koneksi tersedia - Memuat ulang...';
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
+      } else {
+        statusEl.classList.remove('online');
+        statusText.textContent = 'Tidak ada koneksi internet';
+      }
+    }
+    
+    // Listen for online/offline events
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+    
+    // Check initial status
+    updateStatus();
+  </script>
+</body>
+</html>

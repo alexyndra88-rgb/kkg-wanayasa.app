@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import authRoutes from './routes/auth';
 import suratRoutes from './routes/surat';
 import prokerRoutes from './routes/proker';
@@ -9,19 +10,49 @@ import pengumumanRoutes from './routes/pengumuman';
 import forumRoutes from './routes/forum';
 import materiRoutes from './routes/materi';
 import adminRoutes from './routes/admin';
+import filesRoutes from './routes/files';
+import dashboardRoutes from './routes/dashboard';
 import { renderHTML } from './templates/layout';
+import { rateLimitMiddleware, RATE_LIMITS } from './lib/ratelimit';
+import { successResponse, Errors } from './lib/response';
+import { hashPassword } from './lib/auth';
+import { loggingMiddleware, logger } from './lib/logger';
+import type { R2Bucket } from './lib/upload';
 
-type Bindings = { DB: D1Database };
+type Bindings = {
+  DB: D1Database;
+  BUCKET?: R2Bucket;
+};
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-// CORS
-app.use('/api/*', cors({
-  origin: '*',
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
+// Logging Middleware (must be first)
+app.use('/api/*', loggingMiddleware());
+
+// Security Headers
+app.use('*', secureHeaders({
+  xFrameOptions: 'DENY',
+  xContentTypeOptions: 'nosniff',
+  referrerPolicy: 'strict-origin-when-cross-origin',
 }));
+
+// CORS - with proper configuration
+app.use('/api/*', cors({
+  origin: (origin) => {
+    // Allow same-origin and localhost for development
+    if (!origin) return '*';
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) return origin;
+    if (origin.includes('kkg-wanayasa')) return origin;
+    return null;
+  },
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  credentials: true,
+  maxAge: 86400,
+}));
+
+// General rate limiting for all API routes
+app.use('/api/*', rateLimitMiddleware(RATE_LIMITS.api));
 
 // API Routes
 app.route('/api/auth', authRoutes);
@@ -33,6 +64,17 @@ app.route('/api/pengumuman', pengumumanRoutes);
 app.route('/api/forum', forumRoutes);
 app.route('/api/materi', materiRoutes);
 app.route('/api/admin', adminRoutes);
+app.route('/api/files', filesRoutes);
+app.route('/api/dashboard', dashboardRoutes);
+
+// Health check endpoint
+app.get('/api/health', (c) => {
+  return successResponse(c, {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '2.0.0'
+  });
+});
 
 // DB init endpoint (for first setup)
 app.get('/api/init-db', async (c) => {
@@ -108,36 +150,57 @@ CREATE TABLE IF NOT EXISTS forum_replies (
   FOREIGN KEY (thread_id) REFERENCES forum_threads(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_surat_user ON surat_undangan(user_id);
+CREATE INDEX IF NOT EXISTS idx_proker_user ON program_kerja(user_id);
+CREATE INDEX IF NOT EXISTS idx_absensi_kegiatan ON absensi(kegiatan_id);
+CREATE INDEX IF NOT EXISTS idx_absensi_user ON absensi(user_id);
+CREATE INDEX IF NOT EXISTS idx_materi_kategori ON materi(kategori);
+CREATE INDEX IF NOT EXISTS idx_forum_threads_user ON forum_threads(user_id);
+CREATE INDEX IF NOT EXISTS idx_forum_replies_thread ON forum_replies(thread_id);
+CREATE INDEX IF NOT EXISTS idx_pengumuman_pinned ON pengumuman(is_pinned);
 `;
     const stmts = schema.split(';').filter(s => s.trim());
     for (const stmt of stmts) {
       await c.env.DB.prepare(stmt).run();
     }
 
-    // Seed default admin (password: admin123)
+    // Hash password with new PBKDF2 method
+    const adminPasswordHash = await hashPassword('admin123');
+
+    // Seed default admin with secure password hash
     await c.env.DB.prepare(`INSERT OR IGNORE INTO users (id, nama, email, password_hash, role, nip, sekolah, mata_pelajaran, no_hp)
-      VALUES (1, 'Admin KKG Gugus 3', 'admin@kkg-wanayasa.id', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'admin', '198501012010011001', 'SDN 1 Wanayasa', 'Guru Kelas', '081234567890')`).run();
-    
+      VALUES (1, 'Admin KKG Gugus 3', 'admin@kkg-wanayasa.id', ?, 'admin', '198501012010011001', 'SDN 1 Wanayasa', 'Guru Kelas', '081234567890')`)
+      .bind(adminPasswordHash).run();
+
     await c.env.DB.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('mistral_api_key', '')`).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('nama_ketua', 'Admin KKG Gugus 3')`).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('alamat_sekretariat', 'SDN 1 Wanayasa, Jl. Raya Wanayasa No. 1, Kec. Wanayasa, Kab. Purwakarta')`).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('tahun_ajaran', '2025/2026')`).run();
 
-    // Seed sample data
+    // Seed sample users with secure password hash
+    const userPasswordHash = await hashPassword('admin123');
+
     await c.env.DB.prepare(`INSERT OR IGNORE INTO users (id, nama, email, password_hash, role, nip, sekolah, mata_pelajaran, no_hp)
-      VALUES (2, 'Siti Nurhaliza', 'siti@kkg-wanayasa.id', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'user', '198602022011012002', 'SDN 2 Wanayasa', 'Matematika', '081234567891')`).run();
+      VALUES (2, 'Siti Nurhaliza', 'siti@kkg-wanayasa.id', ?, 'user', '198602022011012002', 'SDN 2 Wanayasa', 'Matematika', '081234567891')`)
+      .bind(userPasswordHash).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO users (id, nama, email, password_hash, role, nip, sekolah, mata_pelajaran, no_hp)
-      VALUES (3, 'Budi Santoso', 'budi@kkg-wanayasa.id', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'user', '198703032012011003', 'SDN 3 Wanayasa', 'IPA', '081234567892')`).run();
+      VALUES (3, 'Budi Santoso', 'budi@kkg-wanayasa.id', ?, 'user', '198703032012011003', 'SDN 3 Wanayasa', 'IPA', '081234567892')`)
+      .bind(userPasswordHash).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO users (id, nama, email, password_hash, role, nip, sekolah, mata_pelajaran, no_hp)
-      VALUES (4, 'Dewi Lestari', 'dewi@kkg-wanayasa.id', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'user', '198804042013012004', 'SDN 1 Wanayasa', 'Bahasa Indonesia', '081234567893')`).run();
+      VALUES (4, 'Dewi Lestari', 'dewi@kkg-wanayasa.id', ?, 'user', '198804042013012004', 'SDN 1 Wanayasa', 'Bahasa Indonesia', '081234567893')`)
+      .bind(userPasswordHash).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO users (id, nama, email, password_hash, role, nip, sekolah, mata_pelajaran, no_hp)
-      VALUES (5, 'Ahmad Fauzi', 'ahmad@kkg-wanayasa.id', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'user', '198905052014011005', 'SDN 4 Wanayasa', 'IPS', '081234567894')`).run();
+      VALUES (5, 'Ahmad Fauzi', 'ahmad@kkg-wanayasa.id', ?, 'user', '198905052014011005', 'SDN 4 Wanayasa', 'IPS', '081234567894')`)
+      .bind(userPasswordHash).run();
 
     await c.env.DB.prepare(`INSERT OR IGNORE INTO pengumuman (id, judul, isi, kategori, is_pinned, created_by)
       VALUES (1, 'Selamat Datang di Portal Digital KKG Gugus 3 Wanayasa', 'Assalamualaikum Wr. Wb.\n\nDengan penuh rasa syukur, kami meluncurkan Portal Digital KKG Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta.\n\nPortal ini dirancang untuk memudahkan koordinasi, komunikasi, dan kolaborasi antar guru.\n\nWassalamualaikum Wr. Wb.', 'umum', 1, 1)`).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO pengumuman (id, judul, isi, kategori, is_pinned, created_by)
       VALUES (2, 'Jadwal Rapat Rutin KKG Bulan Februari 2026', 'Rapat rutin bulanan:\n\nHari/Tanggal: Sabtu, 14 Februari 2026\nWaktu: 09.00 - 12.00 WIB\nTempat: SDN 1 Wanayasa\nAgenda: Evaluasi Program Semester Ganjil', 'jadwal', 1, 1)`).run();
-    
+
     await c.env.DB.prepare(`INSERT OR IGNORE INTO kegiatan (id, nama_kegiatan, tanggal, waktu_mulai, waktu_selesai, tempat, deskripsi, created_by)
       VALUES (1, 'Rapat Rutin KKG Februari 2026', '2026-02-14', '09:00', '12:00', 'SDN 1 Wanayasa', 'Evaluasi Program Semester Ganjil', 1)`).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO kegiatan (id, nama_kegiatan, tanggal, waktu_mulai, waktu_selesai, tempat, deskripsi, created_by)
@@ -148,9 +211,10 @@ CREATE TABLE IF NOT EXISTS forum_replies (
     await c.env.DB.prepare(`INSERT OR IGNORE INTO forum_replies (id, thread_id, user_id, isi)
       VALUES (1, 1, 3, 'Saya sudah mencoba pembelajaran diferensiasi dengan membagi siswa berdasarkan gaya belajar. Hasilnya cukup positif!')`).run();
 
-    return c.json({ success: true, message: 'Database berhasil diinisialisasi!' });
+    return successResponse(c, null, 'Database berhasil diinisialisasi!');
   } catch (e: any) {
-    return c.json({ error: e.message }, 500);
+    console.error('Init DB error:', e);
+    return Errors.internal(c, e.message);
   }
 });
 

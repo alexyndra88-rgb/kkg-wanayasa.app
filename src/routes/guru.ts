@@ -1,87 +1,155 @@
 import { Hono } from 'hono';
 import { getCurrentUser, getCookie } from '../lib/auth';
+import { successResponse, Errors, validateRequired } from '../lib/response';
+import type { User, UserPublic } from '../types';
 
 type Bindings = { DB: D1Database };
 
 const guru = new Hono<{ Bindings: Bindings }>();
 
-// List all guru (public)
+// Get all guru (public)
 guru.get('/', async (c) => {
-  const search = c.req.query('search') || '';
-  const sekolah = c.req.query('sekolah') || '';
-  
-  let query = 'SELECT id, nama, nip, nik, mata_pelajaran, sekolah, no_hp, foto_url FROM users WHERE 1=1';
-  const params: string[] = [];
+  try {
+    const search = c.req.query('search') || '';
 
-  if (search) {
-    query += ' AND (nama LIKE ? OR nip LIKE ? OR mata_pelajaran LIKE ?)';
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    let query = `
+      SELECT id, nama, email, role, nip, sekolah, mata_pelajaran, no_hp, foto_url
+      FROM users
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (search) {
+      query += ` AND (nama LIKE ? OR nip LIKE ? OR sekolah LIKE ? OR mata_pelajaran LIKE ?)`;
+      const searchTerm = `%${search}%`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    }
+
+    query += ` ORDER BY nama ASC LIMIT 100`;
+
+    const stmt = c.env.DB.prepare(query);
+    const results = params.length > 0
+      ? await stmt.bind(...params).all()
+      : await stmt.all();
+
+    return successResponse(c, results.results);
+  } catch (e: any) {
+    console.error('Get guru error:', e);
+    return Errors.internal(c);
   }
-  if (sekolah) {
-    query += ' AND sekolah = ?';
-    params.push(sekolah);
-  }
-
-  query += ' ORDER BY nama ASC';
-
-  const stmt = c.env.DB.prepare(query);
-  const results = await (params.length > 0 ? stmt.bind(...params) : stmt).all();
-
-  return c.json({ data: results.results });
 });
 
-// Get sekolah list
-guru.get('/sekolah', async (c) => {
-  const results = await c.env.DB.prepare(
-    'SELECT DISTINCT sekolah FROM users WHERE sekolah IS NOT NULL AND sekolah != "" ORDER BY sekolah ASC'
-  ).all();
-  return c.json({ data: results.results.map((r: any) => r.sekolah) });
+// Get guru by ID
+guru.get('/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+
+    if (!id || isNaN(Number(id))) {
+      return Errors.validation(c, 'ID guru tidak valid');
+    }
+
+    const result: any = await c.env.DB.prepare(`
+      SELECT id, nama, email, role, nip, sekolah, mata_pelajaran, no_hp, foto_url, created_at
+      FROM users WHERE id = ?
+    `).bind(id).first();
+
+    if (!result) {
+      return Errors.notFound(c, 'Guru');
+    }
+
+    return successResponse(c, result);
+  } catch (e: any) {
+    console.error('Get guru detail error:', e);
+    return Errors.internal(c);
+  }
 });
 
-// Update guru profile (self or admin)
-guru.put('/:id', async (c) => {
+// Update profile (self only)
+guru.put('/profile', async (c) => {
   const sessionId = getCookie(c.req.header('Cookie'), 'session');
   const user: any = await getCurrentUser(c.env.DB, sessionId);
-  if (!user) return c.json({ error: 'Silakan login terlebih dahulu' }, 401);
 
-  const id = parseInt(c.req.param('id'));
-  if (user.id !== id && user.role !== 'admin') {
-    return c.json({ error: 'Akses ditolak' }, 403);
+  if (!user) {
+    return Errors.unauthorized(c);
   }
 
-  const body = await c.req.json();
-  const { nama, nip, nik, mata_pelajaran, sekolah, no_hp, alamat } = body;
+  try {
+    const { nama, nip, sekolah, mata_pelajaran, no_hp, alamat } = await c.req.json();
 
-  await c.env.DB.prepare(`
-    UPDATE users SET nama=?, nip=?, nik=?, mata_pelajaran=?, sekolah=?, no_hp=?, alamat=?, updated_at=CURRENT_TIMESTAMP
-    WHERE id=?
-  `).bind(nama, nip || null, nik || null, mata_pelajaran || null, sekolah || null, no_hp || null, alamat || null, id).run();
+    if (!nama || nama.trim().length < 2) {
+      return Errors.validation(c, 'Nama minimal 2 karakter');
+    }
 
-  return c.json({ success: true });
+    await c.env.DB.prepare(`
+      UPDATE users 
+      SET nama = ?, nip = ?, sekolah = ?, mata_pelajaran = ?, no_hp = ?, alamat = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).bind(
+      nama.trim(),
+      nip?.trim() || null,
+      sekolah?.trim() || null,
+      mata_pelajaran?.trim() || null,
+      no_hp?.trim() || null,
+      alamat?.trim() || null,
+      user.id
+    ).run();
+
+    // Get updated user
+    const updatedUser: any = await c.env.DB.prepare(`
+      SELECT id, nama, email, role, nip, sekolah, mata_pelajaran, no_hp, foto_url
+      FROM users WHERE id = ?
+    `).bind(user.id).first();
+
+    return successResponse(c, updatedUser, 'Profil berhasil diperbarui');
+  } catch (e: any) {
+    console.error('Update profile error:', e);
+    return Errors.internal(c);
+  }
 });
 
-// Admin: delete user
-guru.delete('/:id', async (c) => {
-  const sessionId = getCookie(c.req.header('Cookie'), 'session');
-  const user: any = await getCurrentUser(c.env.DB, sessionId);
-  if (!user || user.role !== 'admin') return c.json({ error: 'Akses ditolak' }, 403);
-
-  const id = c.req.param('id');
-  await c.env.DB.prepare('DELETE FROM users WHERE id = ? AND role != ?').bind(id, 'admin').run();
-  return c.json({ success: true });
-});
-
-// Admin: update user role
+// Update user role (admin only)
 guru.put('/:id/role', async (c) => {
   const sessionId = getCookie(c.req.header('Cookie'), 'session');
-  const user: any = await getCurrentUser(c.env.DB, sessionId);
-  if (!user || user.role !== 'admin') return c.json({ error: 'Akses ditolak' }, 403);
+  const currentUser: any = await getCurrentUser(c.env.DB, sessionId);
 
-  const id = c.req.param('id');
-  const { role } = await c.req.json();
+  if (!currentUser || currentUser.role !== 'admin') {
+    return Errors.forbidden(c);
+  }
 
-  await c.env.DB.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, id).run();
-  return c.json({ success: true });
+  try {
+    const id = c.req.param('id');
+    const { role } = await c.req.json();
+
+    if (!id || isNaN(Number(id))) {
+      return Errors.validation(c, 'ID user tidak valid');
+    }
+
+    if (!['admin', 'user'].includes(role)) {
+      return Errors.validation(c, 'Role tidak valid');
+    }
+
+    // Prevent self-demotion
+    if (Number(id) === currentUser.id && role !== 'admin') {
+      return Errors.validation(c, 'Anda tidak dapat menghapus role admin dari diri sendiri');
+    }
+
+    const existing: any = await c.env.DB.prepare(
+      'SELECT id FROM users WHERE id = ?'
+    ).bind(id).first();
+
+    if (!existing) {
+      return Errors.notFound(c, 'User');
+    }
+
+    await c.env.DB.prepare(`
+      UPDATE users SET role = ?, updated_at = datetime('now') WHERE id = ?
+    `).bind(role, id).run();
+
+    return successResponse(c, { id, role }, 'Role berhasil diubah');
+  } catch (e: any) {
+    console.error('Update role error:', e);
+    return Errors.internal(c);
+  }
 });
 
 export default guru;
