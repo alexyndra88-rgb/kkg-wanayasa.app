@@ -11,7 +11,7 @@ const MAX_CSRF_RETRIES = 1;
 /**
  * Refresh CSRF token from server
  */
-async function refreshCsrfToken() {
+export async function refreshCsrfToken() {
     try {
         const response = await fetch(`${API_BASE}/auth/csrf-token`, {
             method: 'GET',
@@ -23,6 +23,32 @@ async function refreshCsrfToken() {
         }
     } catch (e) {
         console.error('Failed to refresh CSRF token:', e);
+    }
+    return null;
+}
+
+/**
+ * Custom API Error class
+ */
+export class ApiError extends Error {
+    constructor(message, code = 'UNKNOWN_ERROR', status = 500) {
+        super(message);
+        this.name = 'ApiError';
+        this.code = code;
+        this.status = status;
+    }
+}
+
+/**
+ * Get CSRF token from cookie
+ */
+export function getCsrfToken() {
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'csrf_token') {
+            return value;
+        }
     }
     return null;
 }
@@ -58,8 +84,12 @@ export async function api(path, options = {}) {
         },
     };
 
-    // If body is an object, stringify it
-    if (mergedOptions.body && typeof mergedOptions.body === 'object') {
+    // If body is FormData, remove Content-Type to let browser set boundary
+    if (mergedOptions.body instanceof FormData) {
+        delete mergedOptions.headers['Content-Type'];
+    }
+    // If body is an object (and not FormData), stringify it
+    else if (mergedOptions.body && typeof mergedOptions.body === 'object') {
         mergedOptions.body = JSON.stringify(mergedOptions.body);
     }
 
@@ -69,12 +99,13 @@ export async function api(path, options = {}) {
         // Handle rate limiting
         if (response.status === 429) {
             const retryAfter = response.headers.get('Retry-After') || '60';
-            const errorData = await response.json().catch(() => ({}));
-            throw new ApiError(
-                errorData.error?.message || `Terlalu banyak permintaan. Coba lagi dalam ${retryAfter} detik.`,
-                'RATE_LIMITED',
-                429
-            );
+            let message = `Terlalu banyak permintaan. Coba lagi dalam ${retryAfter} detik.`;
+            try {
+                const errorData = await response.json();
+                if (errorData.error?.message) message = errorData.error.message;
+            } catch (e) { }
+
+            throw new ApiError(message, 'RATE_LIMITED', 429);
         }
 
         // Parse JSON response
@@ -99,13 +130,14 @@ export async function api(path, options = {}) {
             const errorCode = data.error?.code || 'UNKNOWN_ERROR';
 
             // Handle specific error codes
-            if (errorCode === 'UNAUTHORIZED' || response.status === 401) {
-                // Clear user state and redirect to login
-                if (state.user) {
-                    state.user = null;
-                    showToast('Sesi Anda telah berakhir. Silakan login kembali.', 'warning');
-                }
-            }
+            // if (errorCode === 'UNAUTHORIZED' || response.status === 401) {
+            //     // Clear user state and redirect to login
+            //     // DISABLED: Causing redirect loops or unexpected logouts
+            //     if (state.user) {
+            //         state.user = null;
+            //         showToast('Sesi Anda telah berakhir. Silakan login kembali.', 'warning');
+            //     }
+            // }
 
             throw new ApiError(errorMessage, errorCode, response.status);
         }
@@ -126,31 +158,6 @@ export async function api(path, options = {}) {
     }
 }
 
-/**
- * Custom API Error class
- */
-export class ApiError extends Error {
-    constructor(message, code = 'UNKNOWN_ERROR', status = 500) {
-        super(message);
-        this.name = 'ApiError';
-        this.code = code;
-        this.status = status;
-    }
-}
-
-/**
- * Get CSRF token from cookie
- */
-function getCsrfToken() {
-    const cookies = document.cookie.split(';');
-    for (const cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === 'csrf_token') {
-            return value;
-        }
-    }
-    return null;
-}
 
 /**
  * Shorthand methods for common HTTP verbs
@@ -234,8 +241,16 @@ export function validateForm(data, rules) {
     let valid = true;
 
     for (const [field, fieldRules] of Object.entries(rules)) {
-        for (const rule of fieldRules) {
-            const error = rule(data[field]);
+        // Ensure field exists in data, defaults to empty string if undefined
+        const value = data[field] !== undefined ? data[field] : '';
+
+        // Handle single validator or array of validators
+        const rulesArray = Array.isArray(fieldRules) ? fieldRules : [fieldRules];
+
+        for (const rule of rulesArray) {
+            if (typeof rule !== 'function') continue;
+
+            const error = rule(value);
             if (error) {
                 errors[field] = error;
                 valid = false;
@@ -251,18 +266,29 @@ export function validateForm(data, rules) {
  * Display form errors
  */
 export function showFormErrors(errors, formId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+
     // Clear previous errors
-    document.querySelectorAll(`#${formId} .error-message`).forEach(el => el.remove());
-    document.querySelectorAll(`#${formId} .input-error`).forEach(el => el.classList.remove('input-error'));
+    form.querySelectorAll(`.error-message`).forEach(el => el.remove());
+    form.querySelectorAll(`.input-error`).forEach(el => el.classList.remove('input-error'));
+    form.querySelectorAll(`.border-red-500`).forEach(el => el.classList.remove('border-red-500'));
 
     for (const [field, message] of Object.entries(errors)) {
-        const input = document.querySelector(`#${formId} [name="${field}"]`);
+        const input = form.querySelector(`[name="${field}"]`);
         if (input) {
-            input.classList.add('input-error');
-            const errorEl = document.createElement('div');
-            errorEl.className = 'error-message text-red-500 text-sm mt-1';
-            errorEl.textContent = message;
-            input.parentNode.appendChild(errorEl);
+            input.classList.add('border-red-500', 'focus:ring-red-200', 'focus:border-red-500');
+
+            const errorEl = document.createElement('p');
+            errorEl.className = 'error-message text-red-500 text-xs mt-1';
+            errorEl.innerHTML = `<i class="fas fa-exclamation-circle mr-1"></i>${message}`;
+
+            // Insert after input but handle input groups
+            if (input.parentNode.classList.contains('relative')) {
+                input.parentNode.parentNode.appendChild(errorEl);
+            } else {
+                input.parentNode.appendChild(errorEl);
+            }
         }
     }
 }
@@ -271,6 +297,9 @@ export function showFormErrors(errors, formId) {
  * Clear form errors
  */
 export function clearFormErrors(formId) {
-    document.querySelectorAll(`#${formId} .error-message`).forEach(el => el.remove());
-    document.querySelectorAll(`#${formId} .input-error`).forEach(el => el.classList.remove('input-error'));
+    const form = document.getElementById(formId);
+    if (!form) return;
+
+    form.querySelectorAll(`.error-message`).forEach(el => el.remove());
+    form.querySelectorAll(`.border-red-500`).forEach(el => el.classList.remove('border-red-500', 'focus:ring-red-200', 'focus:border-red-500'));
 }

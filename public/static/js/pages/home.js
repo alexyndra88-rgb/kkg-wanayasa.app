@@ -1,16 +1,16 @@
-
 import { api } from '../api.js';
+import { state } from '../state.js';
 import { navigate } from '../router.js';
 import { formatDateTime, escapeHtml } from '../utils.js';
 
 export async function renderHome() {
-    let pengumuman = [];
-    try {
-        const res = await api('/pengumuman?limit=5');
-        pengumuman = res.data || [];
-    } catch (e) { console.log('Pengumuman not loaded:', e); }
+  let pengumuman = [];
+  try {
+    const res = await api('/pengumuman?limit=5');
+    pengumuman = res.data || [];
+  } catch (e) { console.log('Pengumuman not loaded:', e); }
 
-    return `
+  return `
   <div class="fade-in">
     <!-- Hero Section -->
     <section class="gradient-bg text-white py-16 md:py-24 relative overflow-hidden">
@@ -79,16 +79,22 @@ export async function renderHome() {
         </h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           ${[
-            { id: 'surat', icon: 'fa-envelope', color: 'bg-blue-500', label: 'Generator Surat' },
-            { id: 'proker', icon: 'fa-clipboard-list', color: 'bg-green-500', label: 'Program Kerja' },
-            { id: 'absensi', icon: 'fa-calendar-check', color: 'bg-purple-500', label: 'Absensi Digital' },
-            { id: 'materi', icon: 'fa-book', color: 'bg-orange-500', label: 'Repository Materi' },
-            { id: 'guru', icon: 'fa-users', color: 'bg-teal-500', label: 'Direktori Guru' },
-            { id: 'forum', icon: 'fa-comments', color: 'bg-pink-500', label: 'Forum Diskusi' },
-            { id: 'pengumuman', icon: 'fa-bullhorn', color: 'bg-yellow-500', label: 'Pengumuman' },
-            { id: 'login', icon: 'fa-user-shield', color: 'bg-gray-600', label: 'Profil / Login' },
-        ].map(item => `
-            <button onclick="navigate('${item.id}')" class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition group border border-gray-100">
+      { id: 'surat', icon: 'fa-envelope', color: 'bg-blue-500', label: 'Generator Surat', admin: true },
+      { id: 'proker', icon: 'fa-clipboard-list', color: 'bg-green-500', label: 'Program Kerja', admin: true },
+      { id: 'absensi', icon: 'fa-calendar-check', color: 'bg-purple-500', label: 'Absensi Digital', auth: true },
+      { id: 'materi', icon: 'fa-book', color: 'bg-orange-500', label: 'Repository Materi' },
+      { id: 'guru', icon: 'fa-users', color: 'bg-teal-500', label: 'Direktori Guru' },
+      { id: 'forum', icon: 'fa-comments', color: 'bg-pink-500', label: 'Forum Diskusi' },
+      { id: 'pengumuman', icon: 'fa-bullhorn', color: 'bg-yellow-500', label: 'Pengumuman' },
+      {
+        id: state.user ? 'profile' : 'login',
+        icon: state.user ? 'fa-user-circle' : 'fa-sign-in-alt',
+        color: state.user ? 'bg-indigo-600' : 'bg-gray-600',
+        label: state.user ? 'Profil Saya' : 'Login'
+      },
+    ].map(item => `
+            <button onclick="navigate('${item.id}')" class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition group border border-gray-100 relative overflow-hidden">
+              ${item.admin && (!state.user || state.user.role !== 'admin') ? '<div class="absolute top-2 right-2 text-gray-300"><i class="fas fa-lock"></i></div>' : ''}
               <div class="w-12 h-12 ${item.color} rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition">
                 <i class="fas ${item.icon} text-white text-xl"></i>
               </div>

@@ -12,8 +12,9 @@ export function renderNavbar() {
   const navLinks = [
     { page: 'home', label: 'Beranda', icon: 'fa-home', public: true },
     { page: 'pengumuman', label: 'Pengumuman', icon: 'fa-bullhorn', public: true },
-    { page: 'surat', label: 'Generator Surat', icon: 'fa-file-alt', auth: true },
-    { page: 'proker', label: 'Program Kerja', icon: 'fa-tasks', auth: true },
+    { page: 'surat', label: 'Generator Surat', icon: 'fa-file-alt', admin: true },
+    { page: 'proker', label: 'Program Kerja', icon: 'fa-tasks', admin: true },
+    { page: 'laporan', label: 'Laporan KKG', icon: 'fa-file-contract', admin: true },
     { page: 'absensi', label: 'Absensi', icon: 'fa-clipboard-check', auth: true },
     { page: 'kalender', label: 'Kalender', icon: 'fa-calendar-alt', public: true },
     { page: 'materi', label: 'Materi', icon: 'fa-book-open', public: true },
@@ -192,11 +193,11 @@ export function renderFooter() {
             <ul class="space-y-2 text-sm text-gray-400">
               <li class="flex items-start space-x-2">
                 <i class="fas fa-map-marker-alt mt-1 text-yellow-400"></i>
-                <span>SDN 1 Wanayasa, Kec. Wanayasa, Kab. Purwakarta</span>
+                <span class="max-w-[200px]">${escapeHtml(state.settings?.alamat_sekretariat || 'SDN 1 Wanayasa, Kec. Wanayasa, Kab. Purwakarta')}</span>
               </li>
               <li class="flex items-center space-x-2">
                 <i class="fas fa-envelope text-yellow-400"></i>
-                <span>admin@kkg-wanayasa.id</span>
+                <span>${escapeHtml(state.settings?.email || 'admin@kkg-wanayasa.id')}</span>
               </li>
             </ul>
           </div>

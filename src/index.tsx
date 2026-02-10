@@ -14,6 +14,9 @@ import filesRoutes from './routes/files';
 import dashboardRoutes from './routes/dashboard';
 import calendarRoutes from './routes/calendar';
 import templatesRoutes from './routes/templates';
+import sekolahRoutes from './routes/sekolah';
+import settingsRoutes from './routes/settings';
+import profileRoutes from './routes/profile';
 import { renderHTML } from './templates/layout';
 import { rateLimitMiddleware, RATE_LIMITS } from './lib/ratelimit';
 import { successResponse, Errors } from './lib/response';
@@ -60,6 +63,21 @@ app.use('/api/*', rateLimitMiddleware(RATE_LIMITS.api));
 // CSRF Protection Middleware (validates token on POST/PUT/DELETE)
 app.use('/api/*', csrfMiddleware());
 
+// Cache-Control headers for static files
+// Prevent browser from aggressively caching JS/CSS files
+app.use('/static/*', async (c, next) => {
+  await next();
+  const url = c.req.url;
+  if (url.endsWith('.js') || url.endsWith('.css')) {
+    // JS and CSS: must revalidate every time
+    c.header('Cache-Control', 'no-cache, must-revalidate');
+    c.header('Pragma', 'no-cache');
+  } else if (/\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf)/.test(url)) {
+    // Images and fonts: cache for 1 day
+    c.header('Cache-Control', 'public, max-age=86400');
+  }
+});
+
 // API Routes
 app.route('/api/auth', authRoutes);
 app.route('/api/surat', suratRoutes);
@@ -70,10 +88,17 @@ app.route('/api/pengumuman', pengumumanRoutes);
 app.route('/api/forum', forumRoutes);
 app.route('/api/materi', materiRoutes);
 app.route('/api/admin', adminRoutes);
+import laporanRoutes from './routes/laporan';
+
+// ... existing routes ...
 app.route('/api/files', filesRoutes);
+app.route('/api/laporan', laporanRoutes);
 app.route('/api/dashboard', dashboardRoutes);
 app.route('/api/calendar', calendarRoutes);
 app.route('/api/templates', templatesRoutes);
+app.route('/api/sekolah', sekolahRoutes);
+app.route('/api/settings', settingsRoutes);
+app.route('/api/profile', profileRoutes);
 
 // Health check endpoint
 app.get('/api/health', (c) => {
@@ -184,6 +209,22 @@ CREATE TABLE IF NOT EXISTS surat_templates (
 );
 CREATE INDEX IF NOT EXISTS idx_templates_jenis ON surat_templates(jenis);
 CREATE INDEX IF NOT EXISTS idx_templates_active ON surat_templates(is_active);
+CREATE TABLE IF NOT EXISTS sekolah (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nama TEXT NOT NULL,
+  npsn TEXT UNIQUE,
+  tipe TEXT DEFAULT 'negeri' CHECK(tipe IN ('negeri', 'swasta')),
+  alamat TEXT,
+  kepala_sekolah TEXT,
+  jumlah_guru INTEGER,
+  is_sekretariat INTEGER DEFAULT 0,
+  is_sekolah_penggerak INTEGER DEFAULT 0,
+  keterangan TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sekolah_nama ON sekolah(nama);
+CREATE INDEX IF NOT EXISTS idx_sekolah_tipe ON sekolah(tipe);
 `;
     const stmts = schema.split(';').filter(s => s.trim());
     for (const stmt of stmts) {
@@ -233,6 +274,26 @@ CREATE INDEX IF NOT EXISTS idx_templates_active ON surat_templates(is_active);
       VALUES (1, 'Sharing Best Practice: Pembelajaran Diferensiasi di SD', 'Saya ingin berbagi pengalaman tentang penerapan pembelajaran diferensiasi di kelas saya. Bagaimana pengalaman rekan-rekan?', 'best-practice', 2, 1)`).run();
     await c.env.DB.prepare(`INSERT OR IGNORE INTO forum_replies (id, thread_id, user_id, isi)
       VALUES (1, 1, 3, 'Saya sudah mencoba pembelajaran diferensiasi dengan membagi siswa berdasarkan gaya belajar. Hasilnya cukup positif!')`).run();
+
+    // Seed sekolah data (9 sekolah anggota KKG Gugus 3 Wanayasa)
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO sekolah (id, nama, tipe, is_sekretariat, is_sekolah_penggerak, keterangan)
+      VALUES (1, 'SDN 2 Nangerang', 'negeri', 1, 0, 'Sekretariat KKG Gugus 3')`).run();
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO sekolah (id, nama, tipe, is_sekretariat, is_sekolah_penggerak, keterangan)
+      VALUES (2, 'SDN 1 Nangerang', 'negeri', 0, 0, NULL)`).run();
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO sekolah (id, nama, tipe, is_sekretariat, is_sekolah_penggerak, keterangan)
+      VALUES (3, 'SDN Nagrog', 'negeri', 0, 0, NULL)`).run();
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO sekolah (id, nama, tipe, is_sekretariat, is_sekolah_penggerak, keterangan)
+      VALUES (4, 'SDN Raharja', 'negeri', 0, 1, 'Sekolah Penggerak')`).run();
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO sekolah (id, nama, tipe, is_sekretariat, is_sekolah_penggerak, keterangan)
+      VALUES (5, 'SDN 1 Cibuntu', 'negeri', 0, 0, NULL)`).run();
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO sekolah (id, nama, tipe, is_sekretariat, is_sekolah_penggerak, keterangan)
+      VALUES (6, 'SDN 2 Cibuntu', 'negeri', 0, 0, NULL)`).run();
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO sekolah (id, nama, tipe, is_sekretariat, is_sekolah_penggerak, keterangan)
+      VALUES (7, 'SDN Sumurugul', 'negeri', 0, 0, NULL)`).run();
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO sekolah (id, nama, tipe, is_sekretariat, is_sekolah_penggerak, keterangan)
+      VALUES (8, 'SDN Sakambang', 'negeri', 0, 0, NULL)`).run();
+    await c.env.DB.prepare(`INSERT OR IGNORE INTO sekolah (id, nama, tipe, is_sekretariat, is_sekolah_penggerak, keterangan)
+      VALUES (9, 'SDIT Al-Qalam', 'swasta', 0, 0, 'Sekolah Swasta')`).run();
 
     // Seed formal letter templates
     await c.env.DB.prepare(`INSERT OR IGNORE INTO surat_templates (id, nama, jenis, deskripsi, konten, variables, is_active, created_by)

@@ -16,8 +16,8 @@ export function renderLogin() {
           <div class="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-sm rounded-2xl mb-4">
             <i class="fas fa-graduation-cap text-4xl text-yellow-400"></i>
           </div>
-          <h1 class="text-2xl font-bold text-white">Portal Digital KKG</h1>
-          <p class="text-blue-200">Gugus 3 Kecamatan Wanayasa</p>
+          <h1 id="kkg-name" class="text-2xl font-bold text-white">Portal Digital KKG</h1>
+          <p id="kkg-address-subtitle" class="text-blue-200">Gugus 3 Kecamatan Wanayasa</p>
         </div>
 
         <!-- Card -->
@@ -176,12 +176,21 @@ export function renderLogin() {
 
               <div>
                 <label class="block text-white/80 text-sm font-medium mb-2">Asal Sekolah</label>
-                <input 
-                  type="text" 
-                  name="sekolah" 
-                  placeholder="Nama sekolah (opsional)"
-                  class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 transition-all"
-                />
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-white/50">
+                    <i class="fas fa-school"></i>
+                  </span>
+                  <select 
+                    name="sekolah" 
+                    id="register-sekolah-select"
+                    class="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 transition-all appearance-none"
+                  >
+                    <option value="" class="text-gray-800">-- Pilih Sekolah --</option>
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-white/70">
+                    <i class="fas fa-chevron-down text-xs"></i>
+                  </div>
+                </div>
               </div>
 
               <button 
@@ -217,6 +226,37 @@ export function renderLogin() {
   `;
 }
 
+
+/**
+ * Initialize Auth Page (Load public settings)
+ */
+export async function initAuth() {
+  try {
+    const res = await api('/settings/public');
+    const settings = res.data;
+
+    if (settings) {
+      const nameEl = document.getElementById('kkg-name');
+      const addressEl = document.getElementById('kkg-address-subtitle');
+
+      if (nameEl && settings.nama_kkg) {
+        nameEl.textContent = `Portal Digital ${settings.nama_kkg}`;
+      }
+
+      if (addressEl) {
+        let address = '';
+        if (settings.kecamatan) address += `Kecamatan ${settings.kecamatan}`;
+        if (settings.kabupaten) address += `, Kabupaten ${settings.kabupaten}`;
+
+        // Use full address if available or fallback to built parts
+        addressEl.textContent = settings.alamat_sekretariat || address || 'Gugus 3 Kecamatan Wanayasa';
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load public settings:', e);
+  }
+}
+
 /**
  * Switch between login and register tabs
  */
@@ -250,8 +290,32 @@ window.switchAuthTab = function (tab) {
     tabRegister.classList.add('bg-white/20');
     tabRegister.classList.remove('text-white/70');
     tabRegister.classList.add('text-white');
+
+    // Load sekolah list if empty
+    const sekolahSelect = document.getElementById('register-sekolah-select');
+    if (sekolahSelect && sekolahSelect.options.length <= 1) {
+      loadSekolahForRegister(sekolahSelect);
+    }
   }
 };
+
+async function loadSekolahForRegister(select) {
+  try {
+    const res = await api('/sekolah');
+    const sekolahList = res.data || [];
+
+    // Add options
+    sekolahList.forEach(s => {
+      const option = document.createElement('option');
+      option.value = s.nama;
+      option.textContent = s.nama;
+      option.className = "text-gray-800"; // Ensure text is visible on white background
+      select.appendChild(option);
+    });
+  } catch (e) {
+    console.error('Failed to load sekolah:', e);
+  }
+}
 
 /**
  * Handle login form submission

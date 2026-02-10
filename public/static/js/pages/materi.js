@@ -1,7 +1,7 @@
 
-import { api } from '../api.js';
+import { api, getCsrfToken, refreshCsrfToken } from '../api.js';
 import { state } from '../state.js';
-import { escapeHtml, showToast } from '../utils.js';
+import { escapeHtml, showToast, skeletonCards, emptyState, formatFileSize } from '../utils.js';
 
 function renderMateriCard(m) {
   const icons = { 'RPP': 'fa-file-alt text-blue-500', 'Modul': 'fa-book text-green-500', 'Silabus': 'fa-file-contract text-purple-500', 'Media Ajar': 'fa-photo-video text-pink-500', 'Soal': 'fa-question-circle text-red-500' };
@@ -23,7 +23,7 @@ function renderMateriCard(m) {
           <i class="fas ${icon} text-xl"></i>
         </div>
         <div class="flex-1 min-w-0">
-          <h3 class="font-bold text-gray-800 dark:text-gray-100 truncate">${escapeHtml(m.judul)}</h3>
+          <h3 class="font-bold text-gray-800 dark:text-gray-100 truncate" title="${escapeHtml(m.judul)}">${escapeHtml(m.judul)}</h3>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">${escapeHtml(m.deskripsi || 'Tidak ada deskripsi')}</p>
           
           <!-- Rating Display -->
@@ -43,12 +43,15 @@ function renderMateriCard(m) {
             ${m.kategori ? `<span class="px-2 py-0.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-xs rounded-full">${escapeHtml(m.kategori)}</span>` : ''}
           </div>
           <div class="flex items-center justify-between mt-3 text-xs text-gray-400 dark:text-gray-500">
-            <span><i class="fas fa-user mr-1"></i>${escapeHtml(m.uploader_name || '-')}</span>
+            <div class="flex gap-3">
+               <span><i class="fas fa-user mr-1"></i>${escapeHtml(m.uploader_name || '-')}</span>
+               ${m.file_size ? `<span><i class="fas fa-hdd mr-1"></i>${formatFileSize(m.file_size)}</span>` : ''}
+            </div>
             <span><i class="fas fa-download mr-1"></i>${m.download_count || 0} unduhan</span>
           </div>
           ${m.file_url || m.file_key ? `
           <div class="mt-3">
-            <a href="${m.file_key ? `/api/files/${m.file_key}` : m.file_url}" target="_blank" class="inline-flex items-center px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded-lg transition">
+            <a href="${m.file_key ? `/api/files/${escapeHtml(m.file_key)}` : escapeHtml(m.file_url)}" target="_blank" class="inline-flex items-center px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded-lg transition">
               <i class="fas fa-download mr-1"></i>Download
             </a>
           </div>` : ''}
@@ -59,8 +62,8 @@ function renderMateriCard(m) {
 
 
 export async function renderMateri() {
-  let materiList = [];
-  try { const res = await api('/materi'); materiList = res.data || []; } catch (e) { }
+  // Trigger fetch asynchronously
+  setTimeout(loadMateriList, 0);
 
   return `
   <div class="fade-in max-w-5xl mx-auto py-8 px-4">
@@ -89,9 +92,28 @@ export async function renderMateri() {
     </div>
 
     <div id="materi-list" class="grid md:grid-cols-2 gap-4">
-      ${materiList.length > 0 ? materiList.map(m => renderMateriCard(m)).join('') : '<div class="md:col-span-2 text-center py-12 text-gray-400 dark:text-gray-500"><i class="fas fa-folder-open text-4xl mb-4 block"></i>Belum ada materi yang diupload.</div>'}
+      ${skeletonCards(4)}
     </div>
   </div>`;
+}
+
+async function loadMateriList() {
+  try {
+    const res = await api('/materi');
+    const list = res.data || [];
+    const container = document.getElementById('materi-list');
+    if (container) {
+      container.innerHTML = list.length > 0
+        ? list.map(m => renderMateriCard(m)).join('')
+        : emptyState('fa-folder-open', 'Belum ada materi yang diupload');
+    }
+  } catch (e) {
+    console.error('Load materi error:', e);
+    const container = document.getElementById('materi-list');
+    if (container) {
+      container.innerHTML = `<div class="md:col-span-2 text-center py-8 text-red-500">Gagal memuat materi: ${escapeHtml(e.message)}</div>`;
+    }
+  }
 }
 
 // Store uploaded file data
@@ -222,12 +244,44 @@ async function uploadFile(file) {
     const formData = new FormData();
     formData.append('file', file);
 
+    // Get CSRF token
+    let csrfToken = getCsrfToken();
+    if (!csrfToken) {
+      csrfToken = await refreshCsrfToken();
+    }
+
     // Upload using fetch for progress
-    const response = await fetch('/api/files/upload', {
+    let response = await fetch('/api/files/upload', {
       method: 'POST',
       body: formData,
-      credentials: 'include'
+      credentials: 'include',
+      headers: {
+        'X-CSRF-Token': csrfToken || ''
+      }
     });
+
+    // Handle CSRF retry
+    if (response.status === 403) {
+      try {
+        const errorData = await response.clone().json();
+        if (errorData.error && (errorData.error.code === 'CSRF_MISSING' || errorData.error.code === 'CSRF_INVALID')) {
+          console.log('CSRF token invalid, refreshing...');
+          csrfToken = await refreshCsrfToken();
+          if (csrfToken) {
+            response = await fetch('/api/files/upload', {
+              method: 'POST',
+              body: formData,
+              credentials: 'include',
+              headers: {
+                'X-CSRF-Token': csrfToken
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to check CSRF error:', e);
+      }
+    }
 
     // Simulate progress (since fetch doesn't natively support upload progress)
     let prog = 0;
@@ -284,13 +338,7 @@ window.removeUploadedFile = function () {
     `;
 }
 
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
+
 
 window.uploadMateri = async function (e) {
   e.preventDefault();
@@ -301,16 +349,25 @@ window.uploadMateri = async function (e) {
   btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Menyimpan...';
 
   try {
+    const payload = {
+      judul: form.judul.value,
+      deskripsi: form.deskripsi.value,
+      jenis: form.jenis.value,
+      jenjang: form.jenjang.value,
+      kategori: form.kategori.value,
+      file_url: form.file_url.value
+    };
+
+    if (currentUploadedFile) {
+      payload.file_key = currentUploadedFile.key;
+      payload.file_name = currentUploadedFile.filename;
+      payload.file_size = currentUploadedFile.size;
+      payload.content_type = currentUploadedFile.contentType;
+    }
+
     await api('/materi', {
-      method: 'POST', body: {
-        judul: form.judul.value,
-        deskripsi: form.deskripsi.value,
-        jenis: form.jenis.value,
-        jenjang: form.jenjang.value,
-        kategori: form.kategori.value,
-        file_url: form.file_url.value,
-        file_key: form.file_key.value, // Include uploaded file key
-      }
+      method: 'POST',
+      body: payload
     });
     showToast('Materi berhasil disimpan!', 'success');
     window.location.reload();

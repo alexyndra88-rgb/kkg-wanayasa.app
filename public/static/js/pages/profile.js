@@ -1,343 +1,329 @@
-// Profile Page Module
+import { api } from '../api.js';
 import { state } from '../state.js';
-import { api, validators, validateForm, showFormErrors, clearFormErrors } from '../api.js';
-import { showToast, escapeHtml, avatar, confirm } from '../utils.js';
-import { navigate } from '../router.js';
-import { pageHeader, card, alert } from '../components.js';
+import { showToast, escapeHtml } from '../utils.js';
 
-/**
- * Render Profile page
- */
 export async function renderProfile() {
-    if (!state.user) {
-        navigate('login');
-        return '<div class="p-8 text-center">Redirecting...</div>';
-    }
+  let profile = {};
+  let sekolahList = [];
 
-    return `
-    ${pageHeader('Profil Saya', 'Kelola informasi akun Anda')}
-    
-    <div class="max-w-4xl mx-auto px-4 py-8">
-      <div class="grid md:grid-cols-3 gap-8">
-        <!-- Profile Card -->
-        <div class="md:col-span-1">
-          ${card(`
-            <div class="text-center">
-              <div class="inline-block mb-4">
-                ${avatar(state.user.nama, 'xl', state.user.foto_url)}
-              </div>
-              <h2 class="text-xl font-bold text-gray-800">${escapeHtml(state.user.nama)}</h2>
-              <p class="text-gray-500">${escapeHtml(state.user.email)}</p>
-              <span class="inline-block mt-2 px-3 py-1 ${state.user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'} text-sm rounded-full font-medium">
-                ${state.user.role === 'admin' ? 'Administrator' : 'Member'}
-              </span>
+  try {
+    const [profileRes, sekolahRes] = await Promise.all([
+      api('/profile'),
+      api('/sekolah')
+    ]);
+    profile = profileRes.data;
+    sekolahList = sekolahRes.data || [];
+  } catch (e) {
+    showToast('Gagal memuat profil: ' + e.message, 'error');
+    // Fallback to state user if API fails
+    profile = state.user || {};
+  }
+
+  return `
+    <div class="max-w-4xl mx-auto py-8 px-4 fade-in">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <i class="fas fa-user-circle text-blue-500"></i> Profil Saya
+        </h1>
+
+        <div class="grid md:grid-cols-3 gap-6">
+            <!-- Left Column: Photo & Role -->
+            <div class="md:col-span-1">
+                <div class="bg-white rounded-2xl shadow-sm border p-6 text-center">
+                    <div class="relative w-32 h-32 mx-auto mb-4 group">
+                        <img src="${profile.foto_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.nama)}&background=random`}" 
+                             alt="Foto Profil" 
+                             class="w-full h-full object-cover rounded-full border-4 border-blue-50 group-hover:border-blue-200 transition-colors">
+                        <label class="absolute bottom-0 right-0 bg-blue-500 text-white p-2 rounded-full cursor-pointer hover:bg-blue-600 shadow-md transition-transform hover:scale-110" title="Ubah Foto">
+                            <i class="fas fa-camera text-sm"></i>
+                            <input type="file" accept="image/*" class="hidden" onchange="uploadProfilePhoto(this)">
+                        </label>
+                    </div>
+                    
+                    <h2 class="font-bold text-xl text-gray-800">${escapeHtml(profile.nama)}</h2>
+                    <p class="text-gray-500 text-sm mb-4">${escapeHtml(profile.email)}</p>
+                    
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${profile.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
+                        <i class="fas ${profile.role === 'admin' ? 'fa-shield-alt' : 'fa-user'}"></i>
+                        ${profile.role === 'admin' ? 'Administrator' : 'Anggota KKG'}
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t text-left space-y-3">
+                        <div class="text-sm">
+                            <span class="block text-gray-500 text-xs">Bergabung Sejak</span>
+                            <span class="font-medium text-gray-700">${profile.created_at ? new Date(profile.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-          `)}
-          
-          <div class="mt-4">
-            ${card(`
-              <h3 class="font-semibold text-gray-800 mb-4">
-                <i class="fas fa-shield-alt text-blue-500 mr-2"></i>Keamanan
-              </h3>
-              <button 
-                onclick="toggleChangePassword()"
-                class="w-full py-2 px-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm"
-              >
-                <i class="fas fa-key mr-2"></i>Ubah Password
-              </button>
-            `)}
-          </div>
+
+            <!-- Right Column: Edit Forms -->
+            <div class="md:col-span-2 space-y-6">
+                
+                <!-- Biodata Form -->
+                <div class="bg-white rounded-2xl shadow-sm border p-6">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-id-card text-gray-400"></i> Data Pribadi
+                    </h3>
+                    
+                    <form onsubmit="updateProfile(event)" class="space-y-4">
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                                <input type="text" name="nama" value="${escapeHtml(profile.nama || '')}" required
+                                       class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">NIP</label>
+                                <input type="text" name="nip" value="${escapeHtml(profile.nip || '')}" 
+                                       class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">NIK</label>
+                                <input type="text" name="nik" value="${escapeHtml(profile.nik || '')}" 
+                                       class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">No. HP / WhatsApp</label>
+                                <input type="tel" name="no_hp" value="${escapeHtml(profile.no_hp || '')}" 
+                                       class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Alamat Rumah</label>
+                                <input type="text" name="alamat" value="${escapeHtml(profile.alamat || '')}" 
+                                       class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                            </div>
+                        </div>
+
+                        <hr class="border-gray-100 my-4">
+
+                        <h4 class="font-medium text-gray-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-briefcase text-gray-400"></i> Data Kepegawaian
+                        </h4>
+
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Sekolah Induk</label>
+                                <select name="sekolah" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                                    <option value="">-- Pilih Sekolah --</option>
+                                    ${sekolahList.map(s => `
+                                        <option value="${escapeHtml(s.nama)}" ${profile.sekolah === s.nama ? 'selected' : ''}>${escapeHtml(s.nama)}</option>
+                                    `).join('')}
+                                    <option value="Lainnya" ${profile.sekolah === 'Lainnya' ? 'selected' : ''}>Lainnya</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Mata Pelajaran / Jabatan</label>
+                                <select name="mata_pelajaran_select" onchange="toggleMapelInput(this)" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white mb-2">
+                                    <option value="">-- Pilih Jabatan --</option>
+                                    ${['Kepala Sekolah', 'Guru Kelas 1', 'Guru Kelas 2', 'Guru Kelas 3', 'Guru Kelas 4', 'Guru Kelas 5', 'Guru Kelas 6', 'Guru PAI', 'Guru PJOK', 'Guru Bahasa Inggris', 'Guru Bahasa Sunda', 'Operator Sekolah', 'Penjaga Sekolah'].map(jabatan => `
+                                        <option value="${jabatan}" ${profile.mata_pelajaran === jabatan ? 'selected' : ''}>${jabatan}</option>
+                                    `).join('')}
+                                    <option value="Lainnya" ${!['Kepala Sekolah', 'Guru Kelas 1', 'Guru Kelas 2', 'Guru Kelas 3', 'Guru Kelas 4', 'Guru Kelas 5', 'Guru Kelas 6', 'Guru PAI', 'Guru PJOK', 'Guru Bahasa Inggris', 'Guru Bahasa Sunda', 'Operator Sekolah', 'Penjaga Sekolah'].includes(profile.mata_pelajaran) && profile.mata_pelajaran ? 'selected' : ''}>Lainnya</option>
+                                </select>
+                                <input type="text" name="mata_pelajaran_custom" id="mapel-custom-input" 
+                                       value="${!['Kepala Sekolah', 'Guru Kelas 1', 'Guru Kelas 2', 'Guru Kelas 3', 'Guru Kelas 4', 'Guru Kelas 5', 'Guru Kelas 6', 'Guru PAI', 'Guru PJOK', 'Guru Bahasa Inggris', 'Guru Bahasa Sunda', 'Operator Sekolah', 'Penjaga Sekolah'].includes(profile.mata_pelajaran) ? (profile.mata_pelajaran || '') : ''}" 
+                                       placeholder="Tuliskan jabatan lainnya..."
+                                       class="${!['Kepala Sekolah', 'Guru Kelas 1', 'Guru Kelas 2', 'Guru Kelas 3', 'Guru Kelas 4', 'Guru Kelas 5', 'Guru Kelas 6', 'Guru PAI', 'Guru PJOK', 'Guru Bahasa Inggris', 'Guru Bahasa Sunda', 'Operator Sekolah', 'Penjaga Sekolah'].includes(profile.mata_pelajaran) && profile.mata_pelajaran ? '' : 'hidden'} w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-4">
+                            <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 shadow-md transition-all flex items-center gap-2">
+                                <i class="fas fa-save"></i> Simpan Perubahan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Password Form -->
+                <div class="bg-white rounded-2xl shadow-sm border p-6">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-key text-gray-400"></i> Ganti Password
+                    </h3>
+                    
+                    <form onsubmit="changePassword(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password Saat Ini</label>
+                            <input type="password" name="current_password" required
+                                   class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Password Baru</label>
+                                <input type="password" name="new_password" required minlength="8"
+                                       class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                                <p class="text-xs text-gray-400 mt-1">Minimal 8 karakter</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Konfirmasi Password Baru</label>
+                                <input type="password" name="confirm_password" required minlength="8"
+                                       class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-2">
+                            <button type="submit" class="px-6 py-2 bg-gray-800 text-white rounded-xl font-medium hover:bg-gray-900 shadow-md transition-all flex items-center gap-2">
+                                <i class="fas fa-lock"></i> Update Password
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
         </div>
-
-        <!-- Edit Profile Form -->
-        <div class="md:col-span-2">
-          ${card(`
-            <h3 class="text-lg font-semibold text-gray-800 mb-6">
-              <i class="fas fa-user-edit text-blue-500 mr-2"></i>Edit Profil
-            </h3>
-            
-            <form id="profile-form" onsubmit="handleUpdateProfile(event)">
-              <div class="grid md:grid-cols-2 gap-4">
-                <div class="md:col-span-2">
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap</label>
-                  <input 
-                    type="text" 
-                    name="nama" 
-                    value="${escapeHtml(state.user.nama || '')}"
-                    class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                  <input 
-                    type="email" 
-                    value="${escapeHtml(state.user.email || '')}"
-                    class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500"
-                    disabled
-                  />
-                  <p class="text-xs text-gray-400 mt-1">Email tidak dapat diubah</p>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">NIP</label>
-                  <input 
-                    type="text" 
-                    name="nip" 
-                    value="${escapeHtml(state.user.nip || '')}"
-                    placeholder="Nomor Induk Pegawai"
-                    class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Asal Sekolah</label>
-                  <input 
-                    type="text" 
-                    name="sekolah" 
-                    value="${escapeHtml(state.user.sekolah || '')}"
-                    placeholder="Nama sekolah tempat mengajar"
-                    class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Mata Pelajaran</label>
-                  <input 
-                    type="text" 
-                    name="mata_pelajaran" 
-                    value="${escapeHtml(state.user.mata_pelajaran || '')}"
-                    placeholder="Misal: Matematika, IPA, dll"
-                    class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">No. HP</label>
-                  <input 
-                    type="tel" 
-                    name="no_hp" 
-                    value="${escapeHtml(state.user.no_hp || '')}"
-                    placeholder="08xxxxxxxxxx"
-                    class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                  />
-                </div>
-
-                <div class="md:col-span-2">
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Alamat</label>
-                  <textarea 
-                    name="alamat" 
-                    rows="2"
-                    placeholder="Alamat lengkap (opsional)"
-                    class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all resize-none"
-                  >${escapeHtml(state.user.alamat || '')}</textarea>
-                </div>
-              </div>
-
-              <div class="mt-6 flex justify-end">
-                <button 
-                  type="submit" 
-                  id="save-profile-btn"
-                  class="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-indigo-700 transition-all"
-                >
-                  <span class="btn-text"><i class="fas fa-save mr-2"></i>Simpan Perubahan</span>
-                  <span class="btn-loading hidden"><i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...</span>
-                </button>
-              </div>
-            </form>
-          `)}
-
-          <!-- Change Password Form (Hidden by default) -->
-          <div id="change-password-section" class="mt-4 hidden">
-            ${card(`
-              <h3 class="text-lg font-semibold text-gray-800 mb-6">
-                <i class="fas fa-lock text-yellow-500 mr-2"></i>Ubah Password
-              </h3>
-              
-              ${alert('Password baru harus minimal 8 karakter, mengandung huruf dan angka.', 'info')}
-              
-              <form id="password-form" class="mt-4" onsubmit="handleChangePassword(event)">
-                <div class="space-y-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Password Saat Ini</label>
-                    <input 
-                      type="password" 
-                      name="current_password" 
-                      class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                      required
-                    />
-                  </div>
-
-                  <div class="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">Password Baru</label>
-                      <input 
-                        type="password" 
-                        name="new_password" 
-                        class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">Konfirmasi Password Baru</label>
-                      <input 
-                        type="password" 
-                        name="confirm_password" 
-                        class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div class="mt-6 flex space-x-3 justify-end">
-                  <button 
-                    type="button"
-                    onclick="toggleChangePassword()"
-                    class="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
-                  >
-                    Batal
-                  </button>
-                  <button 
-                    type="submit" 
-                    id="change-password-btn"
-                    class="px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 rounded-xl font-medium hover:from-yellow-500 hover:to-orange-600 transition-all"
-                  >
-                    <span class="btn-text"><i class="fas fa-key mr-2"></i>Ubah Password</span>
-                    <span class="btn-loading hidden"><i class="fas fa-spinner fa-spin mr-2"></i>Memproses...</span>
-                  </button>
-                </div>
-              </form>
-            `)}
-          </div>
-        </div>
-      </div>
     </div>
-  `;
+    `;
 }
 
-/**
- * Toggle change password form visibility
- */
-window.toggleChangePassword = function () {
-    const section = document.getElementById('change-password-section');
-    if (section) {
-        section.classList.toggle('hidden');
-        if (!section.classList.contains('hidden')) {
-            section.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }
-};
+// Global functions for event handlers
+window.toggleMapelInput = function (select) {
+  const customInput = document.getElementById('mapel-custom-input');
+  if (select.value === 'Lainnya') {
+    customInput.classList.remove('hidden');
+    customInput.focus();
+  } else {
+    customInput.classList.add('hidden');
+  }
+}
 
-/**
- * Handle profile update
- */
-window.handleUpdateProfile = async function (e) {
-    e.preventDefault();
+window.updateProfile = async function (e) {
+  e.preventDefault();
+  const form = e.target;
+  const btn = form.querySelector('button[type="submit"]');
+  const originalText = btn.innerHTML;
 
-    const form = e.target;
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData);
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
 
-    // Validate
-    const { valid, errors } = validateForm(data, {
-        nama: [
-            (v) => validators.required(v, 'Nama'),
-            (v) => validators.minLength(v, 2, 'Nama')
-        ]
+  // Determine Mata Pelajaran Value
+  let mapelValue = form.mata_pelajaran_select.value;
+  if (mapelValue === 'Lainnya' || (!mapelValue && form.mata_pelajaran_custom.value)) {
+    mapelValue = form.mata_pelajaran_custom.value;
+  }
+
+  const data = {
+    nama: form.nama.value,
+    nip: form.nip.value,
+    nik: form.nik.value,
+    no_hp: form.no_hp.value,
+    alamat: form.alamat.value,
+    sekolah: form.sekolah.value,
+    mata_pelajaran: mapelValue
+  };
+
+  try {
+    const res = await api('/profile', {
+      method: 'PUT',
+      body: data
     });
 
-    if (!valid) {
-        showFormErrors(errors, 'profile-form');
-        return;
-    }
+    // Update local state and UI
+    state.user = { ...state.user, ...res.data };
+    showToast('Profil berhasil diperbarui', 'success');
 
-    const btn = document.getElementById('save-profile-btn');
-    setButtonLoading(btn, true);
+    // Reload to refresh sidebar/navbar info if needed
+    setTimeout(() => window.location.reload(), 1000);
 
-    try {
-        const response = await api('/guru/profile', {
-            method: 'PUT',
-            body: data
-        });
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
 
-        // Update local state
-        state.user = { ...state.user, ...response.data };
+window.changePassword = async function (e) {
+  e.preventDefault();
+  const form = e.target;
+  const btn = form.querySelector('button[type="submit"]');
+  const originalText = btn.innerHTML;
 
-        showToast('Profil berhasil diperbarui', 'success');
-    } catch (error) {
-        showToast(error.message, 'error');
-    } finally {
-        setButtonLoading(btn, false);
-    }
-};
+  if (form.new_password.value !== form.confirm_password.value) {
+    showToast('Konfirmasi password tidak cocok', 'error');
+    return;
+  }
 
-/**
- * Handle password change
- */
-window.handleChangePassword = async function (e) {
-    e.preventDefault();
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
 
-    const form = e.target;
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData);
-
-    // Validate
-    const { valid, errors } = validateForm(data, {
-        current_password: [
-            (v) => validators.required(v, 'Password saat ini')
-        ],
-        new_password: [
-            (v) => validators.required(v, 'Password baru'),
-            validators.password
-        ],
-        confirm_password: [
-            (v) => validators.required(v, 'Konfirmasi password'),
-            (v) => validators.match(v, data.new_password, 'Password tidak cocok')
-        ]
+  try {
+    await api('/profile/password', {
+      method: 'PUT',
+      body: {
+        current_password: form.current_password.value,
+        new_password: form.new_password.value,
+        confirm_password: form.confirm_password.value
+      }
     });
 
-    if (!valid) {
-        showFormErrors(errors, 'password-form');
-        return;
-    }
+    showToast('Password berhasil diubah. Silakan login ulang.', 'success');
+    form.reset();
 
-    const btn = document.getElementById('change-password-btn');
-    setButtonLoading(btn, true);
+    // Logout user to force re-login with new credentials
+    setTimeout(() => {
+      api('/auth/logout', { method: 'POST' }).finally(() => {
+        window.location.href = '/login';
+      });
+    }, 1500);
 
-    try {
-        await api('/auth/change-password', {
-            method: 'POST',
-            body: data
-        });
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
 
-        showToast('Password berhasil diubah', 'success');
-        form.reset();
-        toggleChangePassword();
-    } catch (error) {
-        showToast(error.message, 'error');
-    } finally {
-        setButtonLoading(btn, false);
-    }
-};
+window.uploadProfilePhoto = async function (input) {
+  if (!input.files || input.files.length === 0) return;
 
-/**
- * Helper to toggle button loading state
- */
-function setButtonLoading(btn, loading) {
-    if (!btn) return;
+  const file = input.files[0];
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('Ukuran foto maksimal 2MB', 'error');
+    return;
+  }
 
-    const textEl = btn.querySelector('.btn-text');
-    const loadingEl = btn.querySelector('.btn-loading');
+  const formData = new FormData();
+  formData.append('file', file);
 
-    if (loading) {
-        btn.disabled = true;
-        if (textEl) textEl.classList.add('hidden');
-        if (loadingEl) loadingEl.classList.remove('hidden');
-    } else {
-        btn.disabled = false;
-        if (textEl) textEl.classList.remove('hidden');
-        if (loadingEl) loadingEl.classList.add('hidden');
-    }
+  showToast('Mengupload foto...', 'info');
+
+  try {
+    // Upload to general file upload endpoint first
+    // Note: we need to handle auth header manually if using fetch with FormData, 
+    // but our API wrapper handles JSON mainly. 
+    // Let's rely on browser cookies for auth.
+
+    // However, we need CSRF token.
+    const csrfToken = getCookie('csrf_token');
+
+    const uploadRes = await fetch('/api/files/upload', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-CSRF-Token': csrfToken
+      }
+    }).then(r => r.json());
+
+    if (!uploadRes.success) throw new Error(uploadRes.message || 'Gagal upload foto');
+
+    // Update profile with new photo URL
+    await api('/profile/photo', {
+      method: 'POST',
+      body: { photo_url: uploadRes.data.url }
+    });
+
+    showToast('Foto profil berhasil diperbarui', 'success');
+    setTimeout(() => window.location.reload(), 1000);
+
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return '';
 }

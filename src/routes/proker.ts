@@ -34,19 +34,31 @@ proker.post('/generate', rateLimitMiddleware(RATE_LIMITS.ai), async (c) => {
       return Errors.validation(c, 'Minimal satu kegiatan harus diisi');
     }
 
-    // Get API key from settings
-    const setting: any = await c.env.DB.prepare(
-      "SELECT value FROM settings WHERE key = 'mistral_api_key'"
-    ).first();
-    const apiKey = setting?.value;
+    // Get settings including organization details
+    const settingsResult = await c.env.DB.prepare(
+      "SELECT key, value FROM settings"
+    ).all();
+
+    const settings: any = {};
+    settingsResult.results?.forEach((row: any) => {
+      settings[row.key] = row.value;
+    });
+
+    const apiKey = settings.mistral_api_key;
 
     if (!apiKey) {
       return Errors.configError(c, 'API Key Mistral belum dikonfigurasi. Hubungi admin untuk mengatur API Key.');
     }
 
+    // Get list of schools from database to prevent AI hallucination
+    const sekolahResult = await c.env.DB.prepare(
+      "SELECT nama FROM sekolah ORDER BY is_sekretariat DESC, nama ASC"
+    ).all();
+    const sekolahList = sekolahResult.results?.map((s: any) => s.nama) || [];
+
     // Format kegiatan for prompt
     const kegiatanFormatted = kegiatan.map((k: KegiatanProker, i: number) =>
-      `${i + 1}. ${k.nama_kegiatan || '-'} | Waktu: ${k.waktu_pelaksanaan || '-'} | PJ: ${k.penanggung_jawab || '-'} | Anggaran: ${k.anggaran || '-'} | Indikator: ${k.indikator || '-'}`
+      `${i + 1}. ${k.nama_kegiatan || '-'} | Waktu: ${k.waktu_pelaksanaan || '-'} | PJ: ${k.penanggung_jawab || '-'} | Anggaran: ${k.anggaran || '-'} | Indikator: ${k.indikator || '-'} | Sumber Dana: ${k.sumber_dana || '-'}`
     ).join('\n');
 
     // Build prompt and call AI
@@ -55,7 +67,9 @@ proker.post('/generate', rateLimitMiddleware(RATE_LIMITS.ai), async (c) => {
       visi,
       misi,
       kegiatan: kegiatanFormatted,
-      analisis_kebutuhan
+      analisis_kebutuhan,
+      sekolah_list: sekolahList,
+      settings: settings // Pass comprehensive settings
     });
 
     let isiDokumen: string;
@@ -174,6 +188,10 @@ proker.delete('/:id', async (c) => {
     return Errors.unauthorized(c);
   }
 
+  if (user.role !== 'admin') {
+    return Errors.forbidden(c);
+  }
+
   try {
     const id = c.req.param('id');
 
@@ -207,6 +225,10 @@ proker.get('/:id/download', async (c) => {
 
   if (!user) {
     return Errors.unauthorized(c);
+  }
+
+  if (user.role !== 'admin') {
+    return Errors.forbidden(c);
   }
 
   try {
@@ -270,6 +292,33 @@ proker.get('/:id/download', async (c) => {
 
   } catch (e: any) {
     console.error('Download proker error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Update proker content
+proker.put('/:id/content', async (c) => {
+  const sessionId = getCookie(c.req.header('Cookie'), 'session');
+  const user: any = await getCurrentUser(c.env.DB, sessionId);
+
+  if (!user) return Errors.unauthorized(c);
+  if (user.role !== 'admin') return Errors.forbidden(c);
+
+  try {
+    const id = c.req.param('id');
+    const { isi_dokumen } = await c.req.json() as { isi_dokumen: string };
+
+    if (!isi_dokumen) return Errors.validation(c, 'Isi dokumen tidak boleh kosong');
+
+    const result = await c.env.DB.prepare(
+      'UPDATE program_kerja SET isi_dokumen = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?'
+    ).bind(isi_dokumen, id, user.id).run();
+
+    if (result.meta.changes === 0) return Errors.notFound(c, 'Program kerja');
+
+    return successResponse(c, null, 'Konten berhasil diperbarui');
+  } catch (e: any) {
+    console.error('Update proker content error:', e);
     return Errors.internal(c);
   }
 });

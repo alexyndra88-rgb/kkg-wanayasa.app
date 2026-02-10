@@ -14,7 +14,7 @@ import { initA11y, announce, renderSkipLinks } from './a11y.js';
 
 // Pages
 import { renderHome } from './pages/home.js';
-import { renderLogin } from './pages/auth.js';
+import { renderLogin, initAuth } from './pages/auth.js';
 import { renderProfile } from './pages/profile.js';
 import { renderSurat } from './pages/surat.js';
 import { renderProker } from './pages/proker.js';
@@ -26,6 +26,7 @@ import { renderPengumuman } from './pages/pengumuman.js';
 import { renderAdmin } from './pages/admin.js';
 import { renderResetPassword, initResetPassword } from './pages/reset-password.js';
 import { renderKalender, initKalender } from './pages/kalender.js';
+import { renderLaporan } from './pages/laporan.js';
 
 // Global exports for inline HTML onclick handlers
 window.navigate = navigate;
@@ -66,6 +67,7 @@ const pages = {
     admin: renderAdmin,
     kalender: renderKalender,
     'reset-password': renderResetPassword,
+    laporan: renderLaporan,
 };
 
 // Protected pages (require authentication)
@@ -116,7 +118,8 @@ async function render() {
             forum: 'Forum Diskusi',
             pengumuman: 'Pengumuman',
             admin: 'Panel Admin',
-            'reset-password': 'Reset Password'
+            'reset-password': 'Reset Password',
+            laporan: 'Laporan Kegiatan'
         };
         // announce disabled
 
@@ -163,6 +166,12 @@ async function render() {
 
     // Scroll to top on page change
     window.scrollTo(0, 0);
+
+    // Initialize Auth page
+    if (page === 'login') {
+        // Use timeout to ensure DOM is ready
+        setTimeout(() => initAuth(), 50);
+    }
 }
 
 // Initialize Router with Render function
@@ -172,26 +181,68 @@ initRouter(render);
 async function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         try {
+            // Force update check on every page load
             const registration = await navigator.serviceWorker.register('/sw.js', {
-                scope: '/'
+                scope: '/',
+                updateViaCache: 'none' // Never use browser cache for SW file itself
             });
             console.log('✅ Service Worker registered:', registration.scope);
+
+            // Check for updates immediately
+            registration.update().catch(() => { });
 
             // Listen for updates
             registration.addEventListener('updatefound', () => {
                 const newWorker = registration.installing;
+                if (!newWorker) return;
+
                 newWorker.addEventListener('statechange', () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        // New version available
-                        showToast('Versi baru tersedia! Refresh untuk update.', 'info');
+                        // New version available - tell it to activate immediately
+                        newWorker.postMessage({ type: 'SKIP_WAITING' });
+                        console.log('🔄 New Service Worker version installed, activating...');
                     }
                 });
             });
+
+            // Listen for controller change (new SW took over)
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                console.log('🔄 New Service Worker active, refreshing...');
+                // Auto-reload to use new cached resources
+                if (!window._swReloaded) {
+                    window._swReloaded = true;
+                    window.location.reload();
+                }
+            });
+
+            // Listen for messages from SW
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data.type === 'SW_UPDATED') {
+                    console.log(`✅ Service Worker updated to ${event.data.version}`);
+                }
+            });
+
         } catch (error) {
             console.error('Service Worker registration failed:', error);
         }
     }
 }
+
+// Utility: Clear all caches (accessible from console: clearAllCaches())
+window.clearAllCaches = async function () {
+    if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        registration.active?.postMessage({ type: 'CLEAR_CACHE' });
+    }
+    // Also clear browser Cache Storage directly
+    if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map(name => caches.delete(name)));
+    }
+    console.log('🗑️ All caches cleared. Reloading...');
+    showToast('Cache dibersihkan! Halaman akan dimuat ulang...', 'success');
+    setTimeout(() => window.location.reload(), 1000);
+};
 
 // App Initialization
 async function init() {
@@ -223,6 +274,17 @@ async function init() {
         } catch (e) {
             console.warn('⚠️ Failed to initialize CSRF token');
         }
+    }
+
+    // Load Public Settings
+    try {
+        const resSettings = await api('/settings/public');
+        if (resSettings.success && resSettings.data) {
+            state.settings = { ...state.settings, ...resSettings.data };
+            console.log('✅ Settings loaded');
+        }
+    } catch (e) {
+        console.warn('⚠️ Failed to load settings:', e);
     }
 
     // Parse initial URL

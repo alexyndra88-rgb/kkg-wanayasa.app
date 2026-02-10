@@ -1,9 +1,18 @@
 /**
  * Service Worker for KKG Portal PWA
- * Enables offline functionality and caching
+ * Enables offline functionality and smart caching
+ * 
+ * CACHE STRATEGY:
+ * - JS/CSS files: Network-First (always check for updates)
+ * - Images/Fonts: Cache-First (rarely change)
+ * - API calls: Network-First (dynamic data)
+ * - HTML pages: Network-First (SPA, always fresh)
  */
 
-const CACHE_NAME = 'kkg-portal-v1';
+// Cache version - UPDATE THIS when deploying new versions
+// Using timestamp ensures cache is always fresh after redeploy
+const CACHE_VERSION = '2026-02-10-v2';
+const CACHE_NAME = `kkg-portal-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
 // Resources to cache immediately on install
@@ -18,45 +27,56 @@ const PRECACHE_RESOURCES = [
     '/static/js/state.js',
     '/static/js/utils.js',
     '/static/js/theme.js',
-    '/manifest.json'
 ];
 
-// Cache-first resources (static assets)
+// Cache-first resources (truly static/immutable assets ONLY)
+// These are assets that almost NEVER change
 const CACHE_FIRST_PATTERNS = [
-    /\/static\//,
     /\.(?:png|jpg|jpeg|gif|svg|ico|webp)$/,
     /\.(?:woff|woff2|ttf|otf|eot)$/,
-    /cdn\.jsdelivr\.net/,
     /fonts\.googleapis\.com/,
     /fonts\.gstatic\.com/,
-    /cdnjs\.cloudflare\.com/
 ];
 
-// Network-first resources (API calls, dynamic content)
+// Network-first resources (JS, CSS, API calls, dynamic content)
+// These MUST always check the network first for updates
 const NETWORK_FIRST_PATTERNS = [
-    /\/api\//
+    /\/api\//,
+    /\/static\/js\//,       // All JS files - always check for updates
+    /\/static\/style\.css/, // CSS - always check for updates
+    /cdn\.tailwindcss\.com/,
+    /cdn\.jsdelivr\.net/,
+    /cdnjs\.cloudflare\.com/,
 ];
 
-// Stale-while-revalidate resources
+// Stale-while-revalidate resources (HTML pages)
 const STALE_REVALIDATE_PATTERNS = [
     /\/$/,
-    /\.html$/
+    /\.html$/,
 ];
 
 /**
  * Install event - precache resources
  */
 self.addEventListener('install', (event) => {
-    console.log('[SW] Installing service worker...');
+    console.log(`[SW] Installing service worker (${CACHE_VERSION})...`);
 
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
                 console.log('[SW] Precaching resources...');
-                return cache.addAll(PRECACHE_RESOURCES);
+                // Use individual requests to avoid one failure blocking all
+                return Promise.allSettled(
+                    PRECACHE_RESOURCES.map(url =>
+                        cache.add(url).catch(err => {
+                            console.warn(`[SW] Failed to precache ${url}:`, err);
+                        })
+                    )
+                );
             })
             .then(() => {
-                console.log('[SW] Precaching complete');
+                console.log('[SW] Precaching complete, skipping waiting...');
+                // Immediately activate the new service worker
                 return self.skipWaiting();
             })
             .catch((error) => {
@@ -66,10 +86,10 @@ self.addEventListener('install', (event) => {
 });
 
 /**
- * Activate event - clean up old caches
+ * Activate event - clean up ALL old caches and take control immediately
  */
 self.addEventListener('activate', (event) => {
-    console.log('[SW] Activating service worker...');
+    console.log(`[SW] Activating service worker (${CACHE_VERSION})...`);
 
     event.waitUntil(
         caches.keys()
@@ -85,7 +105,19 @@ self.addEventListener('activate', (event) => {
             })
             .then(() => {
                 console.log('[SW] Claiming clients...');
+                // Take control of all open tabs immediately
                 return self.clients.claim();
+            })
+            .then(() => {
+                // Notify all clients that a new version is active
+                return self.clients.matchAll().then(clients => {
+                    clients.forEach(client => {
+                        client.postMessage({
+                            type: 'SW_UPDATED',
+                            version: CACHE_VERSION
+                        });
+                    });
+                });
             })
     );
 });
@@ -114,6 +146,7 @@ self.addEventListener('fetch', (event) => {
     } else if (matchesPattern(url, STALE_REVALIDATE_PATTERNS)) {
         event.respondWith(staleWhileRevalidate(event.request));
     } else {
+        // Default: network-first for everything else
         event.respondWith(networkFirst(event.request));
     }
 });
@@ -143,7 +176,7 @@ function isCDNRequest(url) {
 
 /**
  * Cache-first strategy
- * Good for static assets that rarely change
+ * ONLY for truly immutable assets (images, fonts)
  */
 async function cacheFirst(request) {
     const cached = await caches.match(request);
@@ -166,7 +199,8 @@ async function cacheFirst(request) {
 
 /**
  * Network-first strategy
- * Good for API calls and dynamic content
+ * For JS, CSS, API calls, and dynamic content
+ * Always tries the network first, falls back to cache only if offline
  */
 async function networkFirst(request) {
     try {
@@ -177,7 +211,7 @@ async function networkFirst(request) {
         }
         return response;
     } catch (error) {
-        console.log('[SW] Network failed, trying cache...');
+        console.log('[SW] Network failed, trying cache for:', request.url);
 
         const cached = await caches.match(request);
         if (cached) {
@@ -294,9 +328,7 @@ self.addEventListener('sync', (event) => {
  * Sync pending data when back online
  */
 async function syncPendingData() {
-    // Implementation for syncing offline data
     console.log('[SW] Syncing pending data...');
-    // This would read from IndexedDB and POST to server
 }
 
 /**
@@ -308,12 +340,15 @@ self.addEventListener('message', (event) => {
     }
 
     if (event.data.type === 'CLEAR_CACHE') {
-        caches.delete(CACHE_NAME);
+        caches.keys().then(names => {
+            names.forEach(name => caches.delete(name));
+        });
+        console.log('[SW] All caches cleared');
     }
 
     if (event.data.type === 'GET_VERSION') {
-        event.ports[0].postMessage({ version: CACHE_NAME });
+        event.ports[0].postMessage({ version: CACHE_VERSION });
     }
 });
 
-console.log('[SW] Service worker loaded');
+console.log(`[SW] Service worker loaded (${CACHE_VERSION})`);

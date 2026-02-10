@@ -9,6 +9,26 @@ import { navigate } from '../router.js';
 let currentSuratData = null;
 
 export function renderSurat() {
+  // Check Authorization
+  if (state.user && state.user.role !== 'admin') {
+    return `
+      <div class="fade-in max-w-4xl mx-auto py-12 px-4 text-center">
+        <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-3xl p-10 max-w-lg mx-auto">
+          <div class="bg-red-100 dark:bg-red-800/30 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i class="fas fa-lock text-3xl text-red-600 dark:text-red-400"></i>
+          </div>
+          <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-3">Akses Ditolak</h2>
+          <p class="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
+            Maaf, fitur Generator Surat hanya dapat diakses oleh Administrator KKG.
+          </p>
+          <button onclick="navigate('home')" class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition shadow-lg shadow-red-500/30">
+            <i class="fas fa-arrow-left mr-2"></i>Kembali ke Beranda
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   // Return HTML string
   return `
   <div class="fade-in max-w-4xl mx-auto py-8 px-4">
@@ -72,8 +92,17 @@ export function renderSurat() {
           </div>
           <div>
             <label for="tempat_kegiatan" class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2"><i class="fas fa-map-marker-alt mr-1 text-red-400" aria-hidden="true"></i>Tempat Kegiatan <span class="text-red-500">*</span></label>
-            <input type="text" id="tempat_kegiatan" name="tempat_kegiatan" required placeholder="Contoh: SDN 1 Wanayasa"
-              class="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition" aria-required="true">
+            <select id="tempat_kegiatan" name="tempat_kegiatan" required class="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition" aria-required="true">
+              <option value="SDN 2 Nangerang" selected>SDN 2 Nangerang</option>
+              <option value="SDN 1 Nangerang">SDN 1 Nangerang</option>
+              <option value="SDN 1 Cibuntu">SDN 1 Cibuntu</option>
+              <option value="SDN 2 Cibuntu">SDN 2 Cibuntu</option>
+              <option value="SDN Nagrog">SDN Nagrog</option>
+              <option value="SDN Sakambang">SDN Sakambang</option>
+              <option value="SDIT Al-Qalam">SDIT Al-Qalam</option>
+              <option value="SDN 1 Wanayasa">SDN 1 Wanayasa</option>
+              <option value="SDN 2 Wanayasa">SDN 2 Wanayasa</option>
+            </select>
           </div>
           <div>
             <label for="tanggal_kegiatan" class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2"><i class="fas fa-calendar mr-1 text-green-400" aria-hidden="true"></i>Tanggal Kegiatan <span class="text-red-500">*</span></label>
@@ -110,6 +139,10 @@ export function renderSurat() {
             <label for="lampiran" class="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2"><i class="fas fa-paperclip mr-1 text-gray-400" aria-hidden="true"></i>Lampiran</label>
             <input type="text" id="lampiran" name="lampiran" placeholder="Contoh: 1 (satu) berkas, - (jika tidak ada)"
               class="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+            <div class="flex items-center gap-2 mt-2">
+              <input type="checkbox" id="include_struktur" name="include_struktur" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
+              <label for="include_struktur" class="text-sm text-gray-700 dark:text-gray-300 cursor-pointer user-select-none">Sertakan Lampiran Struktur Organisasi</label>
+            </div>
           </div>
         </div>
 
@@ -147,12 +180,15 @@ export function renderSurat() {
         <!-- Edit mode -->
         <div id="surat-edit-mode" class="hidden">
           <textarea id="surat-edit-textarea" rows="20" class="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition font-serif" style="font-family: 'Times New Roman', serif;"></textarea>
-          <div class="flex gap-2 mt-4">
+          <div class="flex gap-2 mt-4 items-center">
             <button onclick="saveSuratEdit()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition">
               <i class="fas fa-save mr-1" aria-hidden="true"></i>Simpan
             </button>
             <button onclick="cancelSuratEdit()" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition">
               <i class="fas fa-times mr-1" aria-hidden="true"></i>Batal
+            </button>
+            <button onclick="insertStructureAttachment()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition ml-auto" title="Sisipkan Lampiran Struktur Organisasi">
+              <i class="fas fa-sitemap mr-1" aria-hidden="true"></i>+ Struktur
             </button>
           </div>
         </div>
@@ -161,6 +197,20 @@ export function renderSurat() {
 
     <div id="surat-history" class="hidden mt-8"></div>
   </div>`;
+}
+
+window.insertStructureAttachment = function () {
+  const textarea = document.getElementById('surat-edit-textarea');
+  if (!textarea) return;
+
+  // Check if already exists
+  if (textarea.value.includes('[LAMPIRAN_STRUKTUR]')) {
+    showToast('Lampiran struktur sudah ada di surat ini', 'info');
+    return;
+  }
+
+  textarea.value += '\n\n[LAMPIRAN_STRUKTUR]';
+  showToast('Marker lampiran struktur ditambahkan ke akhir surat', 'success');
 }
 
 // Store current surat for export
@@ -193,6 +243,22 @@ window.generateSurat = async function (e) {
       method: 'POST',
       body: formData
     });
+
+    // Auto-append structure attachment if requested
+    const includeStruktur = document.getElementById('include_struktur')?.checked;
+    if (includeStruktur) {
+      res.data.isi_surat += '\n\n[LAMPIRAN_STRUKTUR]';
+
+      // Auto-save the updated content to server so DOCX generation includes it
+      try {
+        await api(`/surat/${res.data.id}`, {
+          method: 'PUT',
+          body: { isi_surat: res.data.isi_surat }
+        });
+      } catch (saveErr) {
+        console.error('Auto-save lampiran error:', saveErr);
+      }
+    }
 
     // Store data for export
     currentSuratData = {
@@ -475,17 +541,38 @@ window.editSuratContent = function () {
   document.getElementById('surat-edit-mode').classList.remove('hidden');
 }
 
-window.saveSuratEdit = function () {
+window.saveSuratEdit = async function () {
   const newContent = document.getElementById('surat-edit-textarea').value;
-  document.getElementById('surat-content').textContent = newContent;
+  const btn = document.querySelector('#surat-edit-mode button:first-child');
+  const originalText = btn.innerHTML;
 
-  // Update stored data
-  if (currentSuratData) {
-    currentSuratData.isi_surat = newContent;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Menyimpan...';
+
+  try {
+    // Update stored data locally first
+    document.getElementById('surat-content').textContent = newContent;
+    if (currentSuratData) {
+      currentSuratData.isi_surat = newContent;
+    }
+
+    // If it's a saved surat (has ID), update in database
+    if (currentSuratData && currentSuratData.id) {
+      await api(`/surat/${currentSuratData.id}`, {
+        method: 'PUT',
+        body: { isi_surat: newContent }
+      });
+    }
+
+    cancelSuratEdit();
+    showToast('Perubahan berhasil disimpan', 'success');
+  } catch (e) {
+    console.error('Save surat error:', e);
+    showToast('Gagal menyimpan perubahan: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
   }
-
-  cancelSuratEdit();
-  showToast('Perubahan disimpan', 'success');
 }
 
 window.cancelSuratEdit = function () {

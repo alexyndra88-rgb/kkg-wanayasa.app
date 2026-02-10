@@ -11,18 +11,32 @@ const guru = new Hono<{ Bindings: Bindings }>();
 guru.get('/', async (c) => {
   try {
     const search = c.req.query('search') || '';
+    const sessionId = getCookie(c.req.header('Cookie'), 'session');
+    const user = await getCurrentUser(c.env.DB, sessionId);
+    const isLoggedIn = !!user;
 
-    let query = `
-      SELECT id, nama, email, role, nip, sekolah, mata_pelajaran, no_hp, foto_url
-      FROM users
-      WHERE 1=1
-    `;
+    // Smart Privacy: Hide sensitive data for public users
+    const columns = isLoggedIn
+      ? "id, nama, email, role, nip, sekolah, mata_pelajaran, no_hp, foto_url"
+      : "id, nama, role, sekolah, mata_pelajaran, foto_url"; // No NIP, Email, Phone for public
+
+    let query = `SELECT ${columns} FROM users WHERE 1=1`;
     const params: any[] = [];
 
     if (search) {
-      query += ` AND (nama LIKE ? OR nip LIKE ? OR sekolah LIKE ? OR mata_pelajaran LIKE ?)`;
       const searchTerm = `%${search}%`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      // Public search fields
+      let searchConditions = `(nama LIKE ? OR sekolah LIKE ? OR mata_pelajaran LIKE ?`;
+      params.push(searchTerm, searchTerm, searchTerm);
+
+      // Authenticated search fields (NIP, Phone)
+      if (isLoggedIn) {
+        searchConditions += ` OR nip LIKE ? OR no_hp LIKE ?`;
+        params.push(searchTerm, searchTerm);
+      }
+
+      searchConditions += `)`;
+      query += ` AND ${searchConditions}`;
     }
 
     query += ` ORDER BY nama ASC LIMIT 100`;

@@ -272,6 +272,68 @@ admin.get('/users', async (c) => {
   }
 });
 
+// Update user details
+admin.put('/users/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const { nama, sekolah, email, role } = await c.req.json();
+    const currentUser: any = c.get('user');
+
+    if (!id || isNaN(Number(id))) {
+      return Errors.validation(c, 'ID user tidak valid');
+    }
+
+    // Check user exists
+    const user: any = await c.env.DB.prepare(
+      'SELECT id, role FROM users WHERE id = ?'
+    ).bind(id).first();
+
+    if (!user) {
+      return Errors.notFound(c, 'User');
+    }
+
+    // Prevent demoting last admin
+    if (user.role === 'admin' && role === 'user') {
+      const adminCount: any = await c.env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM users WHERE role = 'admin'"
+      ).first();
+
+      if (adminCount.cnt <= 1) {
+        return Errors.validation(c, 'Tidak dapat mengubah role admin terakhir');
+      }
+    }
+
+    const updates: any[] = [];
+    let query = 'UPDATE users SET updated_at = datetime("now")';
+
+    if (nama) { query += ', nama = ?'; updates.push(nama); }
+    if (sekolah) { query += ', sekolah = ?'; updates.push(sekolah); }
+    if (email) { query += ', email = ?'; updates.push(email); }
+    if (role && ['admin', 'user'].includes(role)) { query += ', role = ?'; updates.push(role); }
+
+    query += ' WHERE id = ?';
+    updates.push(id);
+
+    await c.env.DB.prepare(query).bind(...updates).run();
+
+    // Audit log
+    await createAuditLog(c.env.DB, {
+      user_id: currentUser.id,
+      action: 'USER_PROFILE_UPDATE',
+      entity_type: 'user',
+      entity_id: Number(id),
+      details: { updated_user_id: id, updates: { nama, sekolah, email, role } },
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
+      user_agent: c.req.header('User-Agent')
+    });
+
+    return successResponse(c, null, 'Data user berhasil diperbarui');
+  } catch (e: any) {
+    console.error('Update user error:', e);
+    return Errors.internal(c);
+  }
+});
+
 // Reset user password
 admin.post('/users/:id/reset-password', async (c) => {
   try {

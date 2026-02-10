@@ -1,3 +1,6 @@
+// Generate a version hash at server start time for cache-busting
+const APP_VERSION = Date.now().toString(36);
+
 export function renderHTML(): string {
   return `<!DOCTYPE html>
 <html lang="id">
@@ -50,11 +53,31 @@ export function renderHTML(): string {
     .surat-preview { white-space: pre-wrap; font-family: 'Times New Roman', serif; line-height: 1.8; }
     .proker-preview { white-space: pre-wrap; font-family: 'Times New Roman', serif; line-height: 1.8; }
   </style>
+  <link rel="stylesheet" href="/static/style.css?v=${APP_VERSION}">
 </head>
-<body class="bg-gray-50 min-h-screen">
-  <div id="app"></div>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+  <div id="app">
+    <!-- Initial Loading State (before JS loads) -->
+    <div class="fixed inset-0 flex items-center justify-center bg-gray-50 z-50">
+      <div class="text-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p class="text-gray-500 font-medium">Memuat Aplikasi...</p>
+      </div>
+    </div>
+  </div>
+  
   <div id="toast-container"></div>
-  <script type="module" src="/static/js/main.js"></script>
+  
+  <noscript>
+    <div class="fixed inset-0 flex items-center justify-center bg-white z-[9999] text-center p-4">
+      <div>
+        <h1 class="text-2xl font-bold text-red-600 mb-2">JavaScript Diperlukan</h1>
+        <p class="text-gray-600">Aplikasi ini memerlukan JavaScript untuk berjalan. Mohon aktifkan JavaScript di browser Anda.</p>
+      </div>
+    </div>
+  </noscript>
+
+  <script type="module" src="/static/js/main.js?v=${APP_VERSION}"></script>
 </body>
 </html>`;
 }

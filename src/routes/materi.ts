@@ -64,14 +64,14 @@ materi.post('/', async (c) => {
   }
 
   try {
-    const body = await c.req.json() as CreateMateriRequest & { file_key?: string };
+    const body = await c.req.json();
 
     const validation = validateRequired(body, ['judul']);
     if (!validation.valid) {
       return Errors.validation(c, 'Judul materi harus diisi');
     }
 
-    const { judul, deskripsi, kategori, jenjang, jenis, file_url, file_key } = body;
+    const { judul, deskripsi, kategori, jenjang, jenis, file_url, file_key, file_name, file_size } = body;
 
     // Validate jenjang if provided
     if (jenjang && !['SD', 'SMP', 'SMA'].includes(jenjang)) {
@@ -84,17 +84,36 @@ materi.post('/', async (c) => {
       return Errors.validation(c, 'Jenis materi tidak valid');
     }
 
+    // Validate file_url protocol (security)
+    if (file_url && !file_url.match(/^https?:\/\//)) {
+      return Errors.validation(c, 'URL file harus dimulai dengan http:// atau https://');
+    }
+
+    // Determine final file URL
+    let finalFileUrl = file_url?.trim() || null;
+    let finalFileName = file_name?.trim() || null;
+
+    // If file_key is provided (from R2 upload), construct the API URL
+    if (file_key) {
+      finalFileUrl = `/api/files/${file_key}`;
+      // If file_name is not provided but we have a key, try to extract it or use key
+      if (!finalFileName) {
+        finalFileName = file_key.split('/').pop() || 'file';
+      }
+    }
+
     const result = await c.env.DB.prepare(`
-      INSERT INTO materi (judul, deskripsi, kategori, jenjang, jenis, file_url, file_key, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO materi (judul, deskripsi, kategori, jenjang, jenis, file_url, file_name, file_size, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       judul.trim(),
       deskripsi?.trim() || null,
       kategori?.trim() || null,
       jenjang || null,
       jenis || null,
-      file_url?.trim() || null,
-      file_key?.trim() || null,
+      finalFileUrl,
+      finalFileName,
+      file_size || null,
       user.id
     ).run();
 
@@ -103,13 +122,14 @@ materi.post('/', async (c) => {
       judul,
       jenis,
       jenjang,
-      file_key
+      file_url: finalFileUrl
     }, 'Materi berhasil diupload', 201);
   } catch (e: any) {
     console.error('Upload materi error:', e);
     return Errors.internal(c);
   }
 });
+
 
 // Get materi detail
 materi.get('/:id', async (c) => {

@@ -17,6 +17,7 @@ const CSRF_IGNORE_PATHS = [
     '/api/health',
     '/api/init-db',
     '/api/admin/settings/logo', // File upload uses FormData
+    '/api/files/upload', // File upload uses FormData
 ];
 
 /**

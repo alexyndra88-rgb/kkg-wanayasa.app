@@ -107,6 +107,7 @@ export interface KegiatanProker {
     penanggung_jawab: string;
     anggaran: string;
     indikator: string;
+    sumber_dana?: string;
 }
 
 export interface GenerateProkerRequest {
@@ -115,6 +116,43 @@ export interface GenerateProkerRequest {
     misi: string;
     kegiatan: KegiatanProker[];
     analisis_kebutuhan?: string;
+}
+
+// ============== Laporan Kegiatan (New) ==============
+
+export interface LaporanData {
+    id?: number;
+    user_id: number;
+    program_kerja_id?: number;
+    judul_laporan: string;
+    periode: string;
+
+    // BAB I: Pendahuluan
+    pendahuluan_latar_belakang: string;
+    pendahuluan_tujuan: string;
+    pendahuluan_manfaat: string;
+
+    // BAB II: Pelaksanaan Kegiatan
+    pelaksanaan_waktu_tempat: string;
+    pelaksanaan_materi: string;
+    pelaksanaan_peserta: string;
+
+    // BAB III: Hasil Kegiatan
+    hasil_uraian: string;
+    hasil_tindak_lanjut: string;
+    hasil_dampak: string;
+
+    // BAB IV: Penutup
+    penutup_simpulan: string;
+    penutup_saran: string;
+
+    // Lampiran
+    lampiran_foto: string[]; // URLs
+    lampiran_daftar_hadir?: string; // URL
+
+    status: 'draft' | 'final';
+    created_at?: string;
+    updated_at?: string;
 }
 
 // ============== Kegiatan & Absensi ==============

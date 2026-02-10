@@ -25,6 +25,9 @@ export async function renderAdmin() {
       <button onclick="switchAdminTab('profil')" id="tab-profil" class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
         <i class="fas fa-building mr-1"></i>Profil KKG
       </button>
+      <button onclick="switchAdminTab('sekolah')" id="tab-sekolah" class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+        <i class="fas fa-school mr-1"></i>Daftar Sekolah
+      </button>
       <button onclick="switchAdminTab('settings')" id="tab-settings" class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
         <i class="fas fa-sliders-h mr-1"></i>Pengaturan
       </button>
@@ -261,6 +264,111 @@ export async function renderAdmin() {
       </div>
     </div>
 
+    <!-- Sekolah Tab -->
+    <div id="panel-sekolah" class="hidden">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border dark:border-gray-700">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100"><i class="fas fa-school text-green-500 mr-2"></i>Daftar Sekolah Anggota KKG</h2>
+          <button onclick="showAddSekolahModal()" class="px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600">
+            <i class="fas fa-plus mr-1"></i>Tambah Sekolah
+          </button>
+        </div>
+        
+        <!-- Info Box -->
+        <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-xl p-4 mb-6">
+          <div class="flex items-start gap-3">
+            <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+            <div class="text-sm text-blue-700 dark:text-blue-300">
+              <p class="font-medium mb-1">Data Sekolah untuk AI</p>
+              <p class="text-blue-600 dark:text-blue-400">Data sekolah ini akan digunakan oleh AI ketika generate Program Kerja dan Surat agar tidak salah menyebutkan nama sekolah.</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Sekolah Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 dark:bg-gray-700">
+                <th class="px-4 py-3 text-center dark:text-gray-300 w-12">No</th>
+                <th class="px-4 py-3 text-left dark:text-gray-300">Nama Sekolah</th>
+                <th class="px-4 py-3 text-left dark:text-gray-300">Tipe</th>
+                <th class="px-4 py-3 text-left dark:text-gray-300">Kepala Sekolah</th>
+                <th class="px-4 py-3 text-center dark:text-gray-300">Guru</th>
+                <th class="px-4 py-3 text-center dark:text-gray-300">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="sekolah-table-body">
+              <tr><td colspan="6" class="text-center py-8 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i>Memuat...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Sekolah Modal -->
+      <div id="sekolah-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+          <div class="fixed inset-0 bg-black bg-opacity-50" onclick="closeSekolahModal()"></div>
+          <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg relative z-10">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+              <h3 id="sekolah-modal-title" class="text-lg font-bold text-gray-800 dark:text-gray-100">Tambah Sekolah</h3>
+            </div>
+            <form id="sekolah-form" onsubmit="saveSekolah(event)" class="p-6 space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nama Sekolah *</label>
+                <input type="text" name="nama" required class="w-full px-4 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg" placeholder="SDN 1 Wanayasa">
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">NPSN</label>
+                  <input type="text" name="npsn" class="w-full px-4 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg" placeholder="20231234">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipe</label>
+                  <select name="tipe" class="w-full px-4 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg">
+                    <option value="negeri">Negeri</option>
+                    <option value="swasta">Swasta</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kepala Sekolah</label>
+                <input type="text" name="kepala_sekolah" class="w-full px-4 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg" placeholder="Nama kepala sekolah">
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Jumlah Guru</label>
+                  <input type="number" name="jumlah_guru" class="w-full px-4 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg" placeholder="15">
+                </div>
+                <div class="flex items-end gap-4">
+                  <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input type="checkbox" name="is_sekretariat" class="w-4 h-4">
+                    <span>Sekretariat</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input type="checkbox" name="is_sekolah_penggerak" class="w-4 h-4">
+                    <span>Penggerak</span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Alamat</label>
+                <input type="text" name="alamat" class="w-full px-4 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg" placeholder="Jl. Raya Wanayasa No. 1">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Keterangan</label>
+                <input type="text" name="keterangan" class="w-full px-4 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg" placeholder="Keterangan tambahan">
+              </div>
+              <div class="flex justify-end gap-2 pt-4">
+                <button type="button" onclick="closeSekolahModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Batal</button>
+                <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Simpan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Settings Tab -->
     <div id="panel-settings" class="hidden">
       <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border dark:border-gray-700">
@@ -293,6 +401,31 @@ export async function renderAdmin() {
           </div>
         </form>
       </div>
+
+      <!-- Maintenance Section -->
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border dark:border-gray-700 mt-6">
+        <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4"><i class="fas fa-tools text-gray-500 mr-2"></i>Pemeliharaan</h2>
+        <div class="space-y-4">
+          <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+            <div>
+              <h3 class="font-semibold text-gray-700 dark:text-gray-200">Bersihkan Cache Browser</h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400">Hapus semua file yang tersimpan di cache browser. Berguna jika tampilan tidak update setelah perubahan.</p>
+            </div>
+            <button onclick="clearAllCaches()" class="px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition flex-shrink-0 ml-4">
+              <i class="fas fa-broom mr-1"></i>Bersihkan
+            </button>
+          </div>
+          <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+            <div>
+              <h3 class="font-semibold text-gray-700 dark:text-gray-200">Inisialisasi Database</h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400">Reset dan inisialisasi ulang database. Hanya gunakan jika diperlukan.</p>
+            </div>
+            <button onclick="initDb()" class="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition flex-shrink-0 ml-4">
+              <i class="fas fa-database mr-1"></i>Init DB
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Templates Tab -->
@@ -322,10 +455,52 @@ export async function renderAdmin() {
       </div>
     </div>
 
-    <!-- Users Tab -->
+// Users Tab
     <div id="panel-users" class="hidden">
       <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border dark:border-gray-700">
         <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4"><i class="fas fa-users-cog text-blue-500 mr-2"></i>Kelola Pengguna</h2>
+        
+        <!-- User Edit Modal -->
+        <div id="edit-user-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="document.getElementById('edit-user-modal').classList.add('hidden')"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-blue-200">
+              <div class="px-6 py-4 bg-blue-50 border-b border-blue-100">
+                <h3 class="font-bold text-gray-800 flex items-center"><i class="fas fa-user-edit text-blue-600 mr-2"></i>Edit Pengguna</h3>
+              </div>
+              <form onsubmit="saveUser(event)" class="p-6 space-y-4">
+                <input type="hidden" name="id">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                  <input type="text" name="nama" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input type="email" name="email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Sekolah</label>
+                  <select name="sekolah" id="user-sekolah-select" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">-- Pilih Sekolah --</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select name="role" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-4">
+                  <button type="button" onclick="document.getElementById('edit-user-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Batal</button>
+                  <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Simpan</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead><tr class="bg-gray-50 dark:bg-gray-700"><th class="px-4 py-3 text-left dark:text-gray-300">Nama</th><th class="px-4 py-3 text-left dark:text-gray-300">Email</th><th class="px-4 py-3 text-left dark:text-gray-300">Sekolah</th><th class="px-4 py-3 text-center dark:text-gray-300">Role</th><th class="px-4 py-3 text-center dark:text-gray-300">Aksi</th></tr></thead>
@@ -337,11 +512,14 @@ export async function renderAdmin() {
                   <td class="px-4 py-3 text-gray-500 dark:text-gray-400">${escapeHtml(u.sekolah || '-')}</td>
                   <td class="px-4 py-3 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold ${u.role === 'admin' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}">${u.role}</span></td>
                   <td class="px-4 py-3 text-center">
-                    <button onclick="toggleRole(${u.id}, '${u.role}')" class="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-900/50 mr-1" title="Toggle role">
-                      <i class="fas fa-exchange-alt"></i>
+                    <button onclick='editUser(${JSON.stringify(u).replace(/'/g, "&#39;")})' class="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-900/50 mr-1" title="Edit User">
+                      <i class="fas fa-edit"></i>
                     </button>
                     <button onclick="resetUserPassword(${u.id})" class="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 rounded text-xs hover:bg-yellow-200 dark:hover:bg-yellow-900/50" title="Reset password">
                       <i class="fas fa-key"></i>
+                    </button>
+                    <button onclick="deleteUser(${u.id})" class="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-xs hover:bg-red-200 dark:hover:bg-red-900/50 ml-1" title="Hapus User">
+                      <i class="fas fa-trash"></i>
                     </button>
                   </td>
                 </tr>
@@ -396,7 +574,7 @@ export async function renderAdmin() {
 
 // Tab switching
 window.switchAdminTab = function (tab) {
-  const tabs = ['dashboard', 'profil', 'settings', 'users', 'logs'];
+  const tabs = ['dashboard', 'profil', 'sekolah', 'settings', 'templates', 'users', 'logs'];
   tabs.forEach(t => {
     const tabBtn = document.getElementById(`tab-${t}`);
     const panel = document.getElementById(`panel-${t}`);
@@ -411,11 +589,15 @@ window.switchAdminTab = function (tab) {
     }
   });
 
-  // Load audit logs when switching to logs tab
+  // Load data when switching tabs
   if (tab === 'logs') {
     loadAuditLogsActions();
     loadAuditLogs();
     loadAuditStats();
+  } else if (tab === 'sekolah') {
+    loadSekolah();
+  } else if (tab === 'templates') {
+    loadTemplates();
   }
 }
 
@@ -585,16 +767,161 @@ window.saveSettings = async function (e) {
         alamat_sekretariat: form.alamat_sekretariat.value,
       }
     });
+    // Update local state
+    state.settings = {
+      ...state.settings, ...{
+        mistral_api_key: form.mistral_api_key.value,
+        nama_ketua: form.nama_ketua.value,
+        tahun_ajaran: form.tahun_ajaran.value,
+        alamat_sekretariat: form.alamat_sekretariat.value,
+      }
+    };
     showToast('Pengaturan berhasil disimpan!', 'success');
+
   } catch (e) { showToast(e.message, 'error'); }
 }
 
-window.toggleRole = async function (userId, currentRole) {
-  const newRole = currentRole === 'admin' ? 'user' : 'admin';
-  if (!confirm(`Ubah role menjadi ${newRole}?`)) return;
+window.saveProfilKKG = async function () {
+  const btn = document.querySelector('#panel-profil button');
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+
+  const fields = [
+    'nama_kkg', 'tahun_ajaran', 'npsn_sekolah_induk', 'nama_sekolah_induk',
+    'alamat_sekretariat', 'kecamatan', 'kabupaten', 'provinsi', 'kode_pos',
+    'email_kkg', 'telepon_kkg', 'website_kkg',
+    'nama_ketua', 'nama_sekretaris', 'nama_bendahara',
+    'struktur_organisasi', 'visi_misi'
+  ];
+
+  const data = {};
+  fields.forEach(field => {
+    const el = document.getElementById(`profil-${field}`);
+    if (el) data[field] = el.value;
+  });
+
   try {
-    await api(`/guru/${userId}/role`, { method: 'PUT', body: { role: newRole } });
-    showToast('Role berhasil diubah!', 'success');
+    await api('/admin/settings', {
+      method: 'PUT',
+      body: data
+    });
+    showToast('Profil KKG berhasil disimpan!', 'success');
+
+    // Update local state partially
+    state.settings = { ...state.settings, ...data };
+
+  } catch (e) {
+    console.error('Save profil error:', e);
+    showToast('Gagal menyimpan profil: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+window.uploadLogo = async function (input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // Validate size (max 2MB)
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('Ukuran file maksimal 2MB', 'error');
+    input.value = '';
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('logo', file);
+
+  const preview = document.getElementById('logo-preview');
+  const originalContent = preview.innerHTML;
+  preview.innerHTML = '<div class="text-gray-400 flex flex-col items-center"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><span class="text-xs">Uploading...</span></div>';
+
+  try {
+    const res = await api('/admin/settings/logo', {
+      method: 'POST',
+      body: formData
+    });
+
+    // Update preview
+    if (res.data && res.data.logo_url) {
+      preview.innerHTML = `<img src="${res.data.logo_url}" alt="Logo KKG" class="w-full h-full object-contain">`;
+      showToast('Logo berhasil diupload!', 'success');
+
+      // Update local state if needed
+      if (state.settings) state.settings.logo_url = res.data.logo_url;
+    } else {
+      throw new Error('Gagal mendapatkan URL logo');
+    }
+
+  } catch (e) {
+    console.error('Upload logo error:', e);
+    showToast(e.message || 'Gagal mengupload logo', 'error');
+    preview.innerHTML = originalContent;
+  } finally {
+    input.value = ''; // Reset input to allow re-uploading same file
+  }
+}
+
+window.editUser = async function (user) {
+  const modal = document.getElementById('edit-user-modal');
+  const form = modal.querySelector('form');
+  const sekolahSelect = document.getElementById('user-sekolah-select');
+
+  // Load sekolah list to dropdown
+  try {
+    const res = await api('/sekolah');
+    const sekolahList = res.data || [];
+    sekolahSelect.innerHTML = '<option value="">-- Pilih Sekolah --</option>' +
+      sekolahList.map(s => `<option value="${escapeHtml(s.nama)}">${escapeHtml(s.nama)}</option>`).join('');
+  } catch (e) {
+    console.error('Failed to load sekolah:', e);
+  }
+
+  form.id.value = user.id;
+  form.nama.value = user.nama || '';
+  form.email.value = user.email || '';
+  form.sekolah.value = user.sekolah || '';
+  form.role.value = user.role || 'user';
+
+  modal.classList.remove('hidden');
+}
+
+window.saveUser = async function (e) {
+  e.preventDefault();
+  const form = e.target;
+  // Find submit btn
+  const btn = form.querySelector('button[type="submit"]');
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Menyimpan...';
+
+  try {
+    await api(`/admin/users/${form.id.value}`, {
+      method: 'PUT',
+      body: {
+        nama: form.nama.value,
+        email: form.email.value,
+        sekolah: form.sekolah.value,
+        role: form.role.value
+      }
+    });
+    showToast('Data user berhasil disimpan!', 'success');
+    document.getElementById('edit-user-modal').classList.add('hidden');
+    window.location.reload();
+  } catch (e) {
+    showToast(e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+window.deleteUser = async function (id) {
+  if (!confirm('Apakah Anda yakin ingin menghapus user ini secara permanen?')) return;
+  try {
+    await api(`/admin/users/${id}`, { method: 'DELETE' });
+    showToast('User berhasil dihapus', 'success');
     window.location.reload();
   } catch (e) { showToast(e.message, 'error'); }
 }
@@ -626,6 +953,7 @@ window.saveProfilKKG = async function () {
 
   try {
     await api('/admin/settings', { method: 'PUT', body: data });
+    state.settings = { ...state.settings, ...data };
     showToast('Profil KKG berhasil disimpan!', 'success');
   } catch (e) {
     showToast(e.message, 'error');
@@ -1099,4 +1427,151 @@ window.deleteTemplate = async function (id, nama) {
   } catch (e) {
     showToast(e.message, 'error');
   }
+}
+
+// ============================================
+// Sekolah Management Functions
+// ============================================
+
+let sekolahList = [];
+let editingSekolah = null;
+
+window.loadSekolah = async function () {
+  const container = document.getElementById('sekolah-table-body');
+  if (!container) return;
+
+  try {
+    const res = await api('/sekolah');
+    sekolahList = res.data || [];
+    renderSekolahTable();
+  } catch (e) {
+    container.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-red-500"><i class="fas fa-exclamation-triangle mr-2"></i>${e.message}</td></tr>`;
+  }
+}
+
+function renderSekolahTable() {
+  const container = document.getElementById('sekolah-table-body');
+  if (!container) return;
+
+  if (sekolahList.length === 0) {
+    container.innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center py-8 text-gray-400">
+          <i class="fas fa-school text-2xl mb-2 block opacity-50"></i>
+          Belum ada data sekolah
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  container.innerHTML = sekolahList.map((s, idx) => `
+    <tr class="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+      <td class="px-4 py-3 text-center font-medium dark:text-gray-300">${idx + 1}</td>
+      <td class="px-4 py-3">
+        <div class="font-semibold dark:text-gray-200">${escapeHtml(s.nama)}</div>
+        ${s.is_sekretariat ? '<span class="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs px-2 py-0.5 rounded mt-1">Sekretariat</span>' : ''}
+        ${s.is_sekolah_penggerak ? '<span class="inline-block bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-2 py-0.5 rounded mt-1 ml-1">Penggerak</span>' : ''}
+      </td>
+      <td class="px-4 py-3">
+        <span class="capitalize ${s.tipe === 'negeri' ? 'text-blue-600 dark:text-blue-400' : 'text-purple-600 dark:text-purple-400'}">
+          ${s.tipe === 'negeri' ? '<i class="fas fa-landmark mr-1"></i>' : '<i class="fas fa-building mr-1"></i>'}
+          ${s.tipe}
+        </span>
+      </td>
+      <td class="px-4 py-3 text-gray-600 dark:text-gray-400">${escapeHtml(s.kepala_sekolah || '-')}</td>
+      <td class="px-4 py-3 text-center dark:text-gray-400">${s.jumlah_guru || '-'}</td>
+      <td class="px-4 py-3">
+        <div class="flex gap-2 justify-center">
+          <button onclick="editSekolah(${s.id})" class="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-xs hover:bg-blue-200" title="Edit">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button onclick="deleteSekolah(${s.id}, '${escapeHtml(s.nama).replace(/'/g, "\\'")}');" class="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded text-xs hover:bg-red-200" title="Hapus">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+window.showAddSekolahModal = function () {
+  editingSekolah = null;
+  document.getElementById('sekolah-modal-title').textContent = 'Tambah Sekolah';
+  document.getElementById('sekolah-form').reset();
+  document.getElementById('sekolah-modal').classList.remove('hidden');
+}
+
+window.editSekolah = function (id) {
+  const sekolah = sekolahList.find(s => s.id === id);
+  if (!sekolah) return;
+
+  editingSekolah = sekolah;
+  document.getElementById('sekolah-modal-title').textContent = 'Edit Sekolah';
+
+  const form = document.getElementById('sekolah-form');
+  form.nama.value = sekolah.nama || '';
+  form.npsn.value = sekolah.npsn || '';
+  form.tipe.value = sekolah.tipe || 'negeri';
+  form.alamat.value = sekolah.alamat || '';
+  form.kepala_sekolah.value = sekolah.kepala_sekolah || '';
+  form.jumlah_guru.value = sekolah.jumlah_guru || '';
+  form.is_sekretariat.checked = sekolah.is_sekretariat === 1;
+  form.is_sekolah_penggerak.checked = sekolah.is_sekolah_penggerak === 1;
+  form.keterangan.value = sekolah.keterangan || '';
+
+  document.getElementById('sekolah-modal').classList.remove('hidden');
+}
+
+window.saveSekolah = async function (event) {
+  event.preventDefault();
+
+  const form = event.target;
+  const data = {
+    nama: form.nama.value.trim(),
+    npsn: form.npsn.value.trim() || null,
+    tipe: form.tipe.value,
+    alamat: form.alamat.value.trim() || null,
+    kepala_sekolah: form.kepala_sekolah.value.trim() || null,
+    jumlah_guru: form.jumlah_guru.value ? parseInt(form.jumlah_guru.value) : null,
+    is_sekretariat: form.is_sekretariat.checked,
+    is_sekolah_penggerak: form.is_sekolah_penggerak.checked,
+    keterangan: form.keterangan.value.trim() || null
+  };
+
+  if (!data.nama) {
+    showToast('Nama sekolah harus diisi', 'error');
+    return;
+  }
+
+  try {
+    if (editingSekolah) {
+      await api(`/sekolah/${editingSekolah.id}`, { method: 'PUT', body: data });
+      showToast('Sekolah berhasil diperbarui', 'success');
+    } else {
+      await api('/sekolah', { method: 'POST', body: data });
+      showToast('Sekolah berhasil ditambahkan', 'success');
+    }
+    closeSekolahModal();
+    await loadSekolah();
+  } catch (e) {
+    showToast('Gagal menyimpan: ' + e.message, 'error');
+  }
+}
+
+window.deleteSekolah = async function (id, nama) {
+  if (!confirm(`Yakin ingin menghapus "${nama}"?`)) return;
+
+  try {
+    await api(`/sekolah/${id}`, { method: 'DELETE' });
+    showToast('Sekolah berhasil dihapus', 'success');
+    await loadSekolah();
+  } catch (e) {
+    showToast('Gagal menghapus: ' + e.message, 'error');
+  }
+}
+
+window.closeSekolahModal = function () {
+  document.getElementById('sekolah-modal').classList.add('hidden');
+  editingSekolah = null;
 }

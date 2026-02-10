@@ -4,5 +4,10 @@ export const state = {
     currentPage: 'home',
     loading: false,
     mobileMenuOpen: false,
-    pageParams: {}
+    pageParams: {},
+    settings: {
+        alamat_sekretariat: 'SDN 1 Wanayasa, Kec. Wanayasa, Kab. Purwakarta',
+        nama_kkg: 'KKG Gugus 3 Wanayasa',
+        email: 'admin@kkg-wanayasa.id'
+    }
 };

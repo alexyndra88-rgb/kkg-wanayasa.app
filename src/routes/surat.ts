@@ -228,6 +228,10 @@ surat.get('/:id', async (c) => {
     return Errors.unauthorized(c);
   }
 
+  if (user.role !== 'admin') {
+    return Errors.forbidden(c);
+  }
+
   try {
     const idValidation = validateId(c.req.param('id'));
     if (!idValidation.valid) {
@@ -266,6 +270,10 @@ surat.put('/:id', async (c) => {
 
   if (!user) {
     return Errors.unauthorized(c);
+  }
+
+  if (user.role !== 'admin') {
+    return Errors.forbidden(c);
   }
 
   try {
