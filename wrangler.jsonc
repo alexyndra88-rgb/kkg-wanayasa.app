@@ -10,7 +10,7 @@
     {
       "binding": "DB",
       "database_name": "kkg-production",
-      "database_id": "placeholder-will-be-set-on-deploy"
+      "database_id": "c82b3f88-502d-4bc5-a7fa-2aa651928399"
     }
   ],
   "r2_buckets": [
