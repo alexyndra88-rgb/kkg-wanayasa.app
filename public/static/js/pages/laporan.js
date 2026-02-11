@@ -1,4 +1,3 @@
-
 import { api } from '../api.js';
 import { showToast, showLoading, hideLoading, confirm } from '../utils.js';
 import { state } from '../state.js';
@@ -40,180 +39,246 @@ export async function renderLaporan() {
             ${renderLaporanGrid()}
         </div>
 
-        <!-- Modal Form -->
-        <div id="laporanModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeLaporanModal()"></div>
-                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+        <!-- Modal Form (Full Screen / Two Column) -->
+        <div id="laporanModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen px-4 pb-4 pt-4 text-center sm:block sm:p-0 h-full">
+                <!-- Overlay (Click listener REMOVED to prevent accidental close) -->
+                <div class="fixed inset-0 bg-gray-900 bg-opacity-90 transition-opacity backdrop-blur-sm" aria-hidden="true"></div>
                 
-                <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full border border-gray-100 dark:border-gray-700">
+                <!-- Modal Panel -->
+                <div class="inline-block align-middle bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-4 w-full max-w-[95vw] h-[92vh] flex flex-col border border-gray-200 dark:border-gray-700 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
                     
-                    <!-- Modal Header -->
-                    <div class="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                        <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-white" id="modal-title">
-                            Formulir Laporan Kegiatan
-                        </h3>
-                        <button onclick="closeLaporanModal()" class="text-gray-400 hover:text-gray-500 focus:outline-none">
-                            <span class="sr-only">Close</span>
-                            <i class="fas fa-times text-xl"></i>
+                    <!-- 1. Header (Fixed) -->
+                    <div class="bg-white dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center z-20 shadow-sm shrink-0">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                                <i class="fas fa-file-signature text-blue-600 dark:text-blue-400 text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-900 dark:text-white leading-tight">Editor Laporan</h3>
+                                <p class="text-xs text-gray-500">Edit dan pratinjau konten laporan Anda</p>
+                            </div>
+                        </div>
+                        <button onclick="closeLaporanModal()" class="group p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Tutup Tanpa Simpan">
+                            <i class="fas fa-times text-gray-400 group-hover:text-red-500 text-xl transition-colors"></i>
                         </button>
                     </div>
 
-                    <!-- Modal Body (Wizard) -->
-                    <div class="px-6 py-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                    <!-- 2. Main Body (Split View) -->
+                    <div class="flex flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900">
                         
-                        <!-- Tabs -->
-                        <div class="flex border-b border-gray-200 dark:border-gray-700 mb-6 sticky top-0 bg-white dark:bg-gray-800 z-10 pt-2">
-                            <button onclick="switchTab('umum')" id="tab-umum" class="tab-btn px-4 py-2 text-blue-600 border-b-2 border-blue-600 font-medium text-sm focus:outline-none">Data Umum</button>
-                            <button onclick="switchTab('bab1')" id="tab-bab1" class="tab-btn px-4 py-2 text-gray-500 hover:text-gray-700 border-b-2 border-transparent font-medium text-sm focus:outline-none">BAB I & II</button>
-                            <button onclick="switchTab('bab2')" id="tab-bab2" class="tab-btn px-4 py-2 text-gray-500 hover:text-gray-700 border-b-2 border-transparent font-medium text-sm focus:outline-none">BAB III & IV</button>
-                            <button onclick="switchTab('lampiran')" id="tab-lampiran" class="tab-btn px-4 py-2 text-gray-500 hover:text-gray-700 border-b-2 border-transparent font-medium text-sm focus:outline-none">Lampiran</button>
+                        <!-- Left Sidebar (Navigation) -->
+                        <div class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col shrink-0 overflow-y-auto hidden md:flex">
+                            <div class="p-4 space-y-1">
+                                <button onclick="switchTab('umum')" id="tab-umum" class="w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-3 tab-btn bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                    <i class="fas fa-info-circle"></i>
+                                    <span>Data Umum</span>
+                                </button>
+                                <button onclick="switchTab('bab1')" id="tab-bab1" class="w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-3 tab-btn">
+                                    <i class="fas fa-book-open"></i>
+                                    <span>BAB I & II</span>
+                                </button>
+                                <button onclick="switchTab('bab2')" id="tab-bab2" class="w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-3 tab-btn">
+                                    <i class="fas fa-chart-line"></i>
+                                    <span>BAB III & IV</span>
+                                </button>
+                                <button onclick="switchTab('lampiran')" id="tab-lampiran" class="w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-3 tab-btn">
+                                    <i class="fas fa-images"></i>
+                                    <span>Lampiran Foto</span>
+                                </button>
+                            </div>
+                            
+                            <div class="mt-auto p-4 border-t border-gray-100 dark:border-gray-700">
+                                <div class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                                    <h4 class="text-xs font-bold text-blue-800 dark:text-blue-300 mb-1">Tips Editor</h4>
+                                    <p class="text-[10px] text-blue-600 dark:text-blue-400 leading-relaxed">
+                                        Gunakan fitur 'Generate AI' di menu Data Umum untuk membuat draft awal, lalu edit detailnya disini.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                        <form id="laporanForm" onsubmit="event.preventDefault(); saveLaporan();">
-                            <input type="hidden" id="laporanId">
+                        <!-- Mobile Tab Navigation (Visible only on small screens) -->
+                        <div class="md:hidden w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 absolute top-0 z-10 flex overflow-x-auto">
+                             <button onclick="switchTab('umum')" class="flex-1 py-3 text-center text-xs font-medium border-b-2 tab-btn-mobile">Umum</button>
+                             <button onclick="switchTab('bab1')" class="flex-1 py-3 text-center text-xs font-medium border-b-2 tab-btn-mobile">BAB 1-2</button>
+                             <button onclick="switchTab('bab2')" class="flex-1 py-3 text-center text-xs font-medium border-b-2 tab-btn-mobile">BAB 3-4</button>
+                             <button onclick="switchTab('lampiran')" class="flex-1 py-3 text-center text-xs font-medium border-b-2 tab-btn-mobile">Foto</button>
+                        </div>
 
-                            <!-- TAB: DATA UMUM -->
-                            <div id="content-umum" class="tab-content space-y-4">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Judul Laporan</label>
-                                        <input type="text" id="judul_laporan" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" required placeholder="Contoh: Rapat Rutin Bulanan">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Periode / Tanggal</label>
-                                        <input type="text" id="periode" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" required placeholder="Contoh: 14 Februari 2026">
-                                    </div>
-                                </div>
+                        <!-- Right Content (Form Area) -->
+                        <div class="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 scroll-smooth mt-10 md:mt-0" id="scrollContainer">
+                            <form id="laporanForm" onsubmit="event.preventDefault(); saveLaporan();" class="max-w-4xl mx-auto space-y-8">
+                                <input type="hidden" id="laporanId">
 
-                                <!-- AI Generator Box -->
-                                <div class="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-gray-800 dark:to-gray-800 p-5 rounded-xl border border-purple-100 dark:border-gray-700 mt-4">
-                                    <div class="flex items-start gap-4">
-                                        <div class="p-3 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
-                                            <i class="fas fa-magic text-purple-600 text-xl"></i>
+                                <!-- TAB: DATA UMUM -->
+                                <div id="content-umum" class="tab-content animate-fade-in">
+                                    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm mb-6">
+                                        <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                                            <i class="fas fa-database text-blue-500"></i> Informasi Dasar
+                                        </h4>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div class="col-span-2">
+                                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Judul Laporan</label>
+                                                <input type="text" id="judul_laporan" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-all" required placeholder="Contoh: Laporan Kegiatan KKG Bulan Februari 2026">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Periode / Tanggal</label>
+                                                <input type="text" id="periode" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-all" required placeholder="Contoh: 14 Februari 2026">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tema / Topik</label>
+                                                <input type="text" id="tema" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-all" placeholder="Contoh: Peningkatan Literasi Digital">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Narasumber</label>
+                                                <input type="text" id="narasumber" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-all" placeholder="Nama Narasumber">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tempat</label>
+                                                <input type="text" id="tempat" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-all" placeholder="Lokasi Kegiatan">
+                                            </div>
                                         </div>
-                                        <div class="flex-1">
-                                            <h4 class="font-bold text-gray-900 dark:text-white mb-1">AI Generator Otomatis</h4>
-                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                                                Biarkan AI membuatkan draf lengkap (BAB I - IV) berdasarkan judul kegiatan di atas.
-                                            </p>
-                                            <button type="button" onclick="generateAIContent()" id="btn-ai" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
-                                                <i class="fas fa-bolt"></i> Generate Isi Laporan
+                                    </div>
+
+                                    <!-- AI Generator -->
+                                    <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden group">
+                                        <div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white opacity-10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+                                        <div class="relative z-10 flex flex-col md:flex-row items-center gap-6">
+                                            <div class="p-4 bg-white/20 backdrop-blur-sm rounded-2xl border border-white/20">
+                                                <i class="fas fa-robot text-4xl"></i>
+                                            </div>
+                                            <div class="flex-1 text-center md:text-left">
+                                                <h4 class="text-xl font-bold mb-2">AI Content Generator</h4>
+                                                <p class="text-indigo-100 text-sm mb-0">Biarkan AI menyusun draft lengkap laporan Anda berdasarkan data di atas. Hemat waktu hingga 90%.</p>
+                                            </div>
+                                            <button type="button" onclick="generateAIContent()" id="btn-ai" class="px-6 py-3 bg-white text-indigo-700 font-bold rounded-xl shadow-lg hover:shadow-xl hover:bg-gray-50 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap">
+                                                <i class="fas fa-magic"></i> Generate Draft
                                             </button>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- TAB: BAB I & II -->
-                            <div id="content-bab1" class="tab-content hidden space-y-6">
-                                <div>
-                                    <h4 class="font-bold text-gray-800 dark:text-gray-200 border-b pb-2 mb-4">BAB I: PENDAHULUAN</h4>
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">A. Latar Belakang</label>
-                                            <textarea id="pendahuluan_latar_belakang" rows="4" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
+                                <!-- TAB: BAB I & II -->
+                                <div id="content-bab1" class="tab-content hidden animate-fade-in space-y-8">
+                                    <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm relative">
+                                        <div class="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-2xl"></div>
+                                        <h4 class="text-xl font-bold text-gray-900 dark:text-white mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">BAB I: PENDAHULUAN</h4>
+                                        <div class="space-y-6">
+                                            <div class="space-y-2">
+                                                <label class="text-sm font-bold text-gray-700 dark:text-gray-300">A. Latar Belakang</label>
+                                                <textarea id="pendahuluan_latar_belakang" rows="12" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                            </div>
+                                            <div class="grid grid-cols-1 gap-6">
+                                                <div class="space-y-2">
+                                                    <label class="text-sm font-bold text-gray-700 dark:text-gray-300">B. Tujuan</label>
+                                                    <textarea id="pendahuluan_tujuan" rows="5" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <label class="text-sm font-bold text-gray-700 dark:text-gray-300">C. Manfaat</label>
+                                                    <textarea id="pendahuluan_manfaat" rows="5" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">B. Tujuan</label>
-                                            <textarea id="pendahuluan_tujuan" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">C. Manfaat</label>
-                                            <textarea id="pendahuluan_manfaat" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
+                                    </div>
+
+                                    <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm relative">
+                                        <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-2xl"></div>
+                                        <h4 class="text-xl font-bold text-gray-900 dark:text-white mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">BAB II: PELAKSANAAN</h4>
+                                        <div class="space-y-6">
+                                            <div class="space-y-2">
+                                                <label class="text-sm font-bold text-gray-700 dark:text-gray-300">A. Waktu dan Tempat</label>
+                                                <textarea id="pelaksanaan_waktu_tempat" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <label class="text-sm font-bold text-gray-700 dark:text-gray-300">B. Materi Kegiatan</label>
+                                                <textarea id="pelaksanaan_materi" rows="10" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <label class="text-sm font-bold text-gray-700 dark:text-gray-300">C. Narasumber & Peserta</label>
+                                                <textarea id="pelaksanaan_peserta" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div>
-                                    <h4 class="font-bold text-gray-800 dark:text-gray-200 border-b pb-2 mb-4">BAB II: PELAKSANAAN KEGIATAN</h4>
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">A. Waktu dan Tempat</label>
-                                            <textarea id="pelaksanaan_waktu_tempat" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
+                                <!-- TAB: BAB III & IV -->
+                                <div id="content-bab2" class="tab-content hidden animate-fade-in space-y-8">
+                                    <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm relative">
+                                        <div class="absolute top-0 left-0 w-1 h-full bg-green-500 rounded-l-2xl"></div>
+                                        <h4 class="text-xl font-bold text-gray-900 dark:text-white mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">BAB III: HASIL KEGIATAN</h4>
+                                        <div class="space-y-6">
+                                            <div class="space-y-2">
+                                                <label class="text-sm font-bold text-gray-700 dark:text-gray-300">A. Uraian Jalannya Kegiatan</label>
+                                                <textarea id="hasil_uraian" rows="15" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm font-mono bg-gray-50 dark:bg-gray-900/50"></textarea>
+                                            </div>
+                                            <div class="grid grid-cols-1 gap-6">
+                                                <div class="space-y-2">
+                                                    <label class="text-sm font-bold text-gray-700 dark:text-gray-300">B. Tindak Lanjut</label>
+                                                    <textarea id="hasil_tindak_lanjut" rows="5" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <label class="text-sm font-bold text-gray-700 dark:text-gray-300">C. Dampak</label>
+                                                    <textarea id="hasil_dampak" rows="5" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">B. Materi Kegiatan</label>
-                                            <textarea id="pelaksanaan_materi" rows="4" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">C. Narasumber & Peserta</label>
-                                            <textarea id="pelaksanaan_peserta" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
+                                    </div>
+
+                                    <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm relative">
+                                        <div class="absolute top-0 left-0 w-1 h-full bg-purple-500 rounded-l-2xl"></div>
+                                        <h4 class="text-xl font-bold text-gray-900 dark:text-white mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">BAB IV: PENUTUP</h4>
+                                        <div class="space-y-6">
+                                            <div class="space-y-2">
+                                                <label class="text-sm font-bold text-gray-700 dark:text-gray-300">A. Simpulan</label>
+                                                <textarea id="penutup_simpulan" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <label class="text-sm font-bold text-gray-700 dark:text-gray-300">B. Saran</label>
+                                                <textarea id="penutup_saran" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white leading-relaxed text-sm"></textarea>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- TAB: BAB III & IV -->
-                            <div id="content-bab2" class="tab-content hidden space-y-6">
-                                <div>
-                                    <h4 class="font-bold text-gray-800 dark:text-gray-200 border-b pb-2 mb-4">BAB III: HASIL KEGIATAN</h4>
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">A. Uraian Jalannya Kegiatan</label>
-                                            <textarea id="hasil_uraian" rows="5" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">B. Tindak Lanjut</label>
-                                            <textarea id="hasil_tindak_lanjut" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">C. Dampak</label>
-                                            <textarea id="hasil_dampak" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
-                                        </div>
+                                <!-- TAB: LAMPIRAN -->
+                                <div id="content-lampiran" class="tab-content hidden animate-fade-in">
+                                    <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                                        <h4 class="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                                            <i class="fas fa-camera text-pink-500"></i> Dokumentasi Kegiatan
+                                        </h4>
+                                        <div id="foto-container" class="space-y-4 mb-6"></div>
+                                        <button type="button" onclick="addFotoInput()" class="w-full py-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-500 hover:text-blue-600 hover:border-blue-500 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-all flex items-center justify-center gap-2 group">
+                                            <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900 flex items-center justify-center transition-colors">
+                                                <i class="fas fa-plus"></i>
+                                            </div>
+                                            <span class="font-medium">Tambah Foto / Dokumentasi Lainnya</span>
+                                        </button>
                                     </div>
                                 </div>
-
-                                <div>
-                                    <h4 class="font-bold text-gray-800 dark:text-gray-200 border-b pb-2 mb-4">BAB IV: PENUTUP</h4>
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">A. Simpulan</label>
-                                            <textarea id="penutup_simpulan" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">B. Saran</label>
-                                            <textarea id="penutup_saran" rows="3" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"></textarea>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- TAB: LAMPIRAN -->
-                            <div id="content-lampiran" class="tab-content hidden space-y-4">
-                                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-                                    <div class="flex">
-                                        <div class="flex-shrink-0">
-                                            <i class="fas fa-info-circle text-yellow-600"></i>
-                                        </div>
-                                        <div class="ml-3">
-                                            <p class="text-sm text-yellow-700">Fitur upload file gambar akan segera hadir. Saat ini silakan masukkan URL gambar secara manual.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div id="foto-container" class="space-y-3">
-                                    <!-- Dynamic Inputs -->
-                                </div>
-                                <button type="button" onclick="addFotoInput()" class="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">
-                                    <i class="fas fa-plus-circle"></i> Tambah URL Foto
-                                </button>
-                            </div>
-
-                        </form>
+                            </form>
+                            
+                            <!-- Spacer for footer -->
+                            <div class="h-20"></div>
+                        </div>
                     </div>
 
-                    <!-- Modal Footer -->
-                    <div class="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3">
-                        <button onclick="closeLaporanModal()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors">
-                            Batal
-                        </button>
-                        <button onclick="saveLaporan('draft')" class="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors shadow-sm">
-                            <i class="fas fa-save mr-1"></i> Simpan Draft
-                        </button>
-                        <button onclick="saveLaporan('final')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-blue-500/30">
-                            <i class="fas fa-check-circle mr-1"></i> Simpan Final
-                        </button>
+                    <!-- 3. Footer (Fixed) -->
+                    <div class="bg-white dark:bg-gray-900 px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center z-20 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                        <div class="text-xs text-gray-500 hidden md:block">
+                            <i class="fas fa-save mr-1"></i> Perubahan terakhir disimpan otomatis (draft)
+                        </div>
+                        <div class="flex gap-3 w-full md:w-auto justify-end">
+                            <button onclick="closeLaporanModal()" class="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-all active:scale-95">
+                                Batal
+                            </button>
+                            <button onclick="saveLaporan('draft')" class="px-5 py-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold transition-all shadow-sm hover:shadow active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-file-invoice"></i> Simpan Draft
+                            </button>
+                            <button onclick="saveLaporan('final')" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-check-circle"></i> Simpan Final
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -288,30 +353,112 @@ window.closeLaporanModal = () => {
 window.switchTab = (tabName) => {
     // Hide all contents
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+
     // Show active content
-    document.getElementById(`content-${tabName}`).classList.remove('hidden');
+    const content = document.getElementById(`content-${tabName}`);
+    if (content) {
+        content.classList.remove('hidden');
+        // Scroll to top of content container when switching
+        const container = document.getElementById('scrollContainer');
+        if (container) container.scrollTop = 0;
+    }
 
     // Reset tabs styles
     document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('text-blue-600', 'border-blue-600');
-        btn.classList.add('text-gray-500', 'border-transparent');
+        // Remove active styles
+        btn.classList.remove('bg-blue-50', 'text-blue-700', 'dark:bg-blue-900/30', 'dark:text-blue-400');
+        // Add inactive styles
+        btn.classList.add('text-gray-600', 'dark:text-gray-400', 'hover:bg-gray-50', 'dark:hover:bg-gray-700');
     });
+
     // Set active tab style
     const activeBtn = document.getElementById(`tab-${tabName}`);
-    activeBtn.classList.remove('text-gray-500', 'border-transparent');
-    activeBtn.classList.add('text-blue-600', 'border-blue-600');
+    if (activeBtn) {
+        activeBtn.classList.remove('text-gray-600', 'dark:text-gray-400', 'hover:bg-gray-50', 'dark:hover:bg-gray-700');
+        activeBtn.classList.add('bg-blue-50', 'text-blue-700', 'dark:bg-blue-900/30', 'dark:text-blue-400');
+    }
 };
+
 
 window.addFotoInput = (value = '') => {
     const container = document.getElementById('foto-container');
     const div = document.createElement('div');
-    div.className = 'flex gap-2';
+    div.className = 'flex gap-2 items-start mb-3';
     div.innerHTML = `
-        <input type="text" name="lampiran_foto[]" value="${value}" class="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700" placeholder="https://example.com/foto.jpg">
-        <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 p-2"><i class="fas fa-trash"></i></button>
+        <div class="flex-1">
+            <div class="flex gap-2">
+                <input type="text" name="lampiran_foto[]" value="${value}" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="URL Foto (atau upload file)">
+                
+                <label class="cursor-pointer bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 transition-colors" title="Upload Foto">
+                    <i class="fas fa-upload"></i>
+                    <input type="file" class="hidden" accept="image/*" onchange="uploadFotoLaporan(this)">
+                </label>
+            </div>
+            ${value ? `<div class="mt-1"><img src="${value}" class="h-16 w-auto rounded border border-gray-200 dark:border-gray-700 object-cover"></div>` : '<div class="preview-area mt-1 hidden"></div>'}
+        </div>
+        <button type="button" onclick="this.closest('.flex').remove()" class="text-red-500 hover:text-red-700 p-2 self-start mt-1" title="Hapus"><i class="fas fa-trash"></i></button>
     `;
     container.appendChild(div);
 };
+
+window.uploadFotoLaporan = async (input) => {
+    if (!input.files || !input.files[0]) return;
+
+    const file = input.files[0];
+    const parentRow = input.closest('.flex-1');
+    const urlInput = parentRow.querySelector('input[type="text"]');
+    const previewArea = parentRow.querySelector('.preview-area');
+    const uploadBtnIcon = input.parentElement.querySelector('i');
+
+    // Show validation
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        showToast('Ukuran file terlalu besar (max 5MB)', 'error');
+        input.value = '';
+        return;
+    }
+
+    // Set loading state
+    const originalIcon = uploadBtnIcon.className;
+    uploadBtnIcon.className = 'fas fa-circle-notch fa-spin';
+    parentRow.classList.add('opacity-70', 'pointer-events-none');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        // Use existing file upload endpoint
+        const res = await fetch('/api/files/upload', {
+            method: 'POST',
+            body: formData,
+            // Don't set Content-Type header manually, let browser set boundary
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            // Success
+            urlInput.value = data.data.url;
+            showToast('Foto berhasil diupload', 'success');
+
+            // Show preview
+            if (previewArea) {
+                previewArea.innerHTML = `<img src="${data.data.url}" class="h-16 w-auto rounded border border-gray-200 dark:border-gray-700 object-cover">`;
+                previewArea.classList.remove('hidden');
+            }
+        } else {
+            throw new Error(data.error?.message || 'Gagal upload file');
+        }
+    } catch (e) {
+        console.error('Upload Error:', e);
+        showToast(e.message, 'error');
+    } finally {
+        // Reset state
+        uploadBtnIcon.className = originalIcon;
+        parentRow.classList.remove('opacity-70', 'pointer-events-none');
+        input.value = ''; // Reset input so same file can be selected again if needed
+    }
+};
+
 
 window.generateAIContent = async () => {
     const judul = document.getElementById('judul_laporan').value;
@@ -332,7 +479,10 @@ window.generateAIContent = async () => {
             method: 'POST',
             body: {
                 judul_laporan: judul,
-                periode: periode
+                periode: periode,
+                tema: document.getElementById('tema').value,
+                narasumber: document.getElementById('narasumber').value,
+                tempat: document.getElementById('tempat').value
             }
         });
 

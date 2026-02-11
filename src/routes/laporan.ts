@@ -15,7 +15,7 @@ const laporan = new Hono<{ Bindings: Bindings }>();
 laporan.post('/generate-content', async (c) => {
     try {
         const body = await c.req.json();
-        const { judul_laporan, periode, program_kerja_judul } = body;
+        const { judul_laporan, periode, program_kerja_judul, tema, narasumber, tempat } = body;
 
         // Get API key from settings
         const { value: apiKey } = await c.env.DB.prepare(
@@ -39,6 +39,9 @@ laporan.post('/generate-content', async (c) => {
             judul_laporan,
             periode,
             program_kerja_judul,
+            tema,
+            narasumber,
+            tempat, // Passed to prompt builder for context (e.g. in Waktu dan Tempat)
             settings
         });
 
@@ -52,49 +55,66 @@ laporan.post('/generate-content', async (c) => {
             "INSERT INTO audit_logs (user_id, action, details) VALUES (NULL, 'AI_DEBUG_SUCCESS', ?)"
         ).bind(JSON.stringify({ raw: generatedText.substring(0, 5000) })).run().catch((err: any) => console.error('Log error', err));
 
-        // Helper to extract text between markers safely
-        const extract = (startMarker: string, endMarker: string | null = null): string => {
+        // Helper to extract text using Regex for flexibility
+        const extractRegex = (startPattern: RegExp, endPattern: RegExp | null = null): string => {
             try {
-                const s = generatedText.indexOf(startMarker);
-                if (s === -1) {
-                    console.log(`Marker not found: ${startMarker}`);
+                const matchStart = generatedText.match(startPattern);
+                if (!matchStart) {
+                    console.log(`Marker not found for pattern: ${startPattern}`);
                     return '';
                 }
 
-                const contentStart = s + startMarker.length;
-                let contentEnd = generatedText.length;
+                const startIndex = matchStart.index! + matchStart[0].length;
+                let endIndex = generatedText.length;
 
-                if (endMarker) {
-                    const e = generatedText.indexOf(endMarker, contentStart);
-                    if (e !== -1) {
-                        contentEnd = e;
+                if (endPattern) {
+                    // Search for end marker after the start marker
+                    const restOfText = generatedText.slice(startIndex);
+                    const matchEnd = restOfText.match(endPattern);
+
+                    if (matchEnd) {
+                        endIndex = startIndex + matchEnd.index!;
                     } else {
-                        console.log(`End marker not found for ${startMarker}: ${endMarker}`);
+                        // Fallback: Try to find the next Chapter header if section end not found
+                        const nextChapter = restOfText.match(/\nBAB\s+[IVX]+/i);
+                        if (nextChapter) {
+                            endIndex = startIndex + nextChapter.index!;
+                        }
                     }
                 }
 
-                return generatedText.substring(contentStart, contentEnd).trim();
+                let content = generatedText.substring(startIndex, endIndex).trim();
+
+                // Clean up common AI artifacts from the start of the content
+                content = content.replace(/^[:\-\s]+/, '').trim();
+
+                return content;
             } catch (e) {
-                console.error(`Error extracting content for marker ${startMarker}:`, e);
+                console.error(`Error extracting content:`, e);
                 return '';
             }
         };
 
+        // Define Regex patterns for sections (Flexible: case insensitive, optional bold **, optional spacing)
+        // Matches "A. Title", "**A. Title**", "A.  Title", etc.
+        const p = (str: string) => new RegExp(`(?:^|\\n)\\s*(?:\\*\\*)?\\s*${str}\\s*(?:\\*\\*)?\\s*(?:$|\\n|:)`, 'i');
+        const bab = (num: string, title: string) => new RegExp(`(?:^|\\n)\\s*(?:\\*\\*)?\\s*BAB\\s+${num}[:\\s]+${title}\\s*(?:\\*\\*)?\\s*(?:$|\\n)`, 'i');
+
         // Parse sections robustly
-        const pendahuluan_latar_belakang = extract('A. Latar Belakang', 'B. Tujuan');
-        const pendahuluan_tujuan = extract('B. Tujuan', 'C. Manfaat');
-        const pendahuluan_manfaat = extract('C. Manfaat', 'BAB II: PELAKSANAAN KEGIATAN');
+        const pendahuluan_latar_belakang = extractRegex(p('A\\.\\s*Latar\\s*Belakang'), p('B\\.\\s*Tujuan'));
+        const pendahuluan_tujuan = extractRegex(p('B\\.\\s*Tujuan'), p('C\\.\\s*Manfaat'));
+        const pendahuluan_manfaat = extractRegex(p('C\\.\\s*Manfaat'), bab('II', 'PELAKSANAAN')); // Fallback to BAB II if end marker missing
 
-        const pelaksanaan_waktu_tempat = extract('A. Waktu dan Tempat', 'B. Materi Kegiatan');
-        const pelaksanaan_materi = extract('B. Materi Kegiatan', 'C. Narasumber dan Peserta');
-        const pelaksanaan_peserta = extract('C. Narasumber dan Peserta', 'BAB III: HASIL KEGIATAN');
+        const pelaksanaan_waktu_tempat = extractRegex(p('A\\.\\s*Waktu\\s*dan\\s*Tempat'), p('B\\.\\s*Materi'));
+        const pelaksanaan_materi = extractRegex(p('B\\.\\s*Materi\\s*Kegiatan'), p('C\\.\\s*Narasumber'));
+        const pelaksanaan_peserta = extractRegex(p('C\\.\\s*Narasumber\\s*dan\\s*Peserta'), bab('III', 'HASIL'));
 
-        const hasil_uraian = extract('A. Uraian Jalannya Kegiatan', 'B. Tindak Lanjut');
-        const hasil_tindak_lanjut = extract('B. Tindak Lanjut', 'C. Dampak');
-        const hasil_dampak = extract('C. Dampak', 'BAB IV: PENUTUP');
+        const hasil_uraian = extractRegex(p('A\\.\\s*Uraian\\s*Jalannya\\s*Kegiatan'), p('B\\.\\s*Tindak\\s*Lanjut'));
+        const hasil_tindak_lanjut = extractRegex(p('B\\.\\s*Tindak\\s*Lanjut'), p('C\\.\\s*Dampak'));
+        const hasil_dampak = extractRegex(p('C\\.\\s*Dampak'), bab('IV', 'PENUTUP'));
 
-        const penutup_simpulan = extract('A. Simpulan', 'B. Saran');
-        const penutup_saran = extract('B. Saran', null);
+        const penutup_simpulan = extractRegex(p('A\\.\\s*Simpulan'), p('B\\.\\s*Saran'));
+        const penutup_saran = extractRegex(p('B\\.\\s*Saran'), null); // Until end of text
 
         const parsed = {
             pendahuluan_latar_belakang,

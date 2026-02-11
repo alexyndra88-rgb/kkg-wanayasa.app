@@ -3,53 +3,53 @@
 const MISTRAL_API_URL = 'https://api.mistral.ai/v1/chat/completions';
 
 export async function callMistral(apiKey: string, prompt: string): Promise<string> {
-  if (!apiKey) {
-    throw new Error('API Key Mistral belum dikonfigurasi. Silakan hubungi admin untuk mengatur API Key di halaman Pengaturan.');
-  }
+   if (!apiKey) {
+      throw new Error('API Key Mistral belum dikonfigurasi. Silakan hubungi admin untuk mengatur API Key di halaman Pengaturan.');
+   }
 
-  const response = await fetch(MISTRAL_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'mistral-large-latest',
-      messages: [
-        {
-          role: 'system',
-          content: `Anda adalah asisten ahli administrasi pendidikan Indonesia yang sangat berpengalaman dalam menyusun dokumen resmi untuk Kelompok Kerja Guru (KKG). Anda memahami format surat dinas pendidikan Indonesia, tata bahasa Indonesia yang baik dan benar, serta pedoman-pedoman dari Kementerian Pendidikan dan Kebudayaan. Selalu gunakan bahasa Indonesia yang formal, sopan, dan profesional. PENTING: Selalu selesaikan dokumen sampai bagian terakhir, jangan berhenti di tengah.`
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 16384, // Increased for complete Program Kerja documents
-    }),
-  });
+   const response = await fetch(MISTRAL_API_URL, {
+      method: 'POST',
+      headers: {
+         'Content-Type': 'application/json',
+         'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+         model: 'mistral-large-latest',
+         messages: [
+            {
+               role: 'system',
+               content: `Anda adalah asisten ahli administrasi pendidikan Indonesia yang sangat berpengalaman dalam menyusun dokumen resmi untuk Kelompok Kerja Guru (KKG). Anda memahami format surat dinas pendidikan Indonesia, tata bahasa Indonesia yang baik dan benar, serta pedoman-pedoman dari Kementerian Pendidikan dan Kebudayaan. Selalu gunakan bahasa Indonesia yang formal, sopan, dan profesional. PENTING: Selalu selesaikan dokumen sampai bagian terakhir, jangan berhenti di tengah.`
+            },
+            {
+               role: 'user',
+               content: prompt
+            }
+         ],
+         temperature: 0.7,
+         max_tokens: 16384, // Increased for complete Program Kerja documents
+      }),
+   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gagal memanggil API Mistral: ${response.status} - ${error}`);
-  }
+   if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Gagal memanggil API Mistral: ${response.status} - ${error}`);
+   }
 
-  const data: any = await response.json();
-  return data.choices[0]?.message?.content || 'Tidak ada respons dari AI.';
+   const data: any = await response.json();
+   return data.choices[0]?.message?.content || 'Tidak ada respons dari AI.';
 }
 
 export function buildSuratPrompt(input: {
-  jenis_kegiatan: string;
-  tanggal_kegiatan: string;
-  waktu_kegiatan: string;
-  tempat_kegiatan: string;
-  agenda: string;
-  peserta: string;
-  penanggung_jawab: string;
-  nomor_surat?: string;
+   jenis_kegiatan: string;
+   tanggal_kegiatan: string;
+   waktu_kegiatan: string;
+   tempat_kegiatan: string;
+   agenda: string;
+   peserta: string;
+   penanggung_jawab: string;
+   nomor_surat?: string;
 }): string {
-  return `Tulis surat undangan resmi untuk kegiatan KKG Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta dengan detail berikut:
+   return `Tulis surat undangan resmi untuk kegiatan KKG Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta dengan detail berikut:
 
 - Jenis Kegiatan: ${input.jenis_kegiatan}
 - Hari/Tanggal: ${input.tanggal_kegiatan}
@@ -78,23 +78,23 @@ INSTRUKSI PENTING:
 }
 
 export function buildProkerPrompt(input: {
-  tahun_ajaran: string;
-  visi: string;
-  misi: string;
-  kegiatan: string;
-  analisis_kebutuhan?: string;
-  sekolah_list?: string[];
-  settings?: any;
+   tahun_ajaran: string;
+   visi: string;
+   misi: string;
+   kegiatan: string;
+   analisis_kebutuhan?: string;
+   sekolah_list?: string[];
+   settings?: any;
 }): string {
-  const sekolahInfo = input.sekolah_list && input.sekolah_list.length > 0
-    ? `\n\nDAFTAR SEKOLAH ANGGOTA KKG GUGUS 3 WANAYASA:\n${input.sekolah_list.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\nPENTING: Gunakan HANYA nama-nama sekolah di atas. JANGAN gunakan nama sekolah lain yang tidak ada di daftar.`
-    : '';
+   const sekolahInfo = input.sekolah_list && input.sekolah_list.length > 0
+      ? `\n\nDAFTAR SEKOLAH ANGGOTA KKG GUGUS 3 WANAYASA:\n${input.sekolah_list.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\nPENTING: Gunakan HANYA nama-nama sekolah di atas. JANGAN gunakan nama sekolah lain yang tidak ada di daftar.`
+      : '';
 
 
 
-  const s = input.settings || {};
+   const s = input.settings || {};
 
-  return `Anda adalah ahli penyusunan dokumen administrasi pendidikan Indonesia. Susun PROGRAM KERJA TAHUNAN yang LENGKAP dan PROFESIONAL untuk KKG Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta, Tahun Ajaran ${input.tahun_ajaran}.
+   return `Anda adalah ahli penyusunan dokumen administrasi pendidikan Indonesia. Susun PROGRAM KERJA TAHUNAN yang LENGKAP dan PROFESIONAL untuk KKG Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta, Tahun Ajaran ${input.tahun_ajaran}.
 
 === DATA INPUT ===
 
@@ -475,61 +475,65 @@ JANGAN berhenti sebelum BAB V dan LEMBAR PENGESAHAN selesai ditulis!`;
 }
 
 export function buildLaporanPrompt(input: {
-  judul_laporan: string;
-  periode: string;
-  program_kerja_judul?: string;
-  settings?: any;
+   judul_laporan: string;
+   periode: string;
+   program_kerja_judul?: string;
+   tema?: string;
+   narasumber?: string;
+   tempat?: string;
+   settings?: any;
 }): string {
-  const s = input.settings || {};
+   const s = input.settings || {};
 
-  return `Anda adalah sekretaris profesional KKG (Kelompok Kerja Guru). Buatlah draf LAPORAN KEGIATAN KKG yang LENGKAP dan FORMAL berdasarkan data berikut:
+   return `Anda adalah sekretaris profesional KKG (Kelompok Kerja Guru) Gugus 3 Wanayasa yang berdedikasi tinggi. Tugas Anda adalah menyusun LAPORAN KEGIATAN KKG yang FAKTUAL, ANALITIS, dan PROFESIONAL.
 
-JUDUL KEGIATAN: ${input.judul_laporan}
-PERIODE: ${input.periode}
-${input.program_kerja_judul ? `DASAR PROGRAM: ${input.program_kerja_judul}` : ''}
+*** DATA INPUT ***
+JUDUL KEGIATAN: ${input.judul_laporan.toUpperCase()}
+PERIODE/TANGGAL: ${input.periode}
+${input.tema ? `TEMA/TOPIK: ${input.tema}` : ''}
+${input.narasumber ? `NARASUMBER: ${input.narasumber}` : ''}
+${input.tempat ? `LOKASI: ${input.tempat}` : ''}
+${input.program_kerja_judul ? `DASAR ACUAN: ${input.program_kerja_judul}` : ''}
+KETUA KKG: ${s.nama_ketua || '...'}
+NIP KETUA: ${s.nip_ketua || '...'}
 
-Ketua KKG: ${s.nama_ketua || '...'}
-NIP Ketua: ${s.nip_ketua || '...'}
-
-=== INSTRUKSI STRUKTUR ===
-
-Buat dokumen dengan 4 BAB utama secara berurutan. PAHAMI INI: Output Anda akan dipotong-potong oleh sistem berdasarkan judul sub-bab (contoh: "A. Latar Belakang").
-JADI, ANDA WAJIB MENULIS JUDUL SUB-BAB PERSIS SEPERTI DI BAWAH INI (HURUF KAPITAL DI AWAL KATA):
+*** INSTRUKTUR PENYUSUNAN KONTEN ***
+Susun laporan dalam 4 BAB utama. Gunakan Bahasa Indonesia baku yang formal dan efektif (EYD V). Hindari kalimat yang bertele-tele atau repetitif. Berikan analisis mendalam, bukan sekadar deskripsi.
 
 BAB I: PENDAHULUAN
 A. Latar Belakang
-(Tulis 2-3 paragraf latar belakang yang relevan dengan judul kegiatan)
+   Jelaskan urgensi kegiatan ini dalam konteks peningkatan kompetensi guru (Pedagogik/Profesional)${input.tema ? ` khususnya terkait tema "${input.tema}"` : ''} dan relevansinya dengan kebutuhan siswa atau kondisi pendidikan terkini (misal: Kurikulum Merdeka). Hindari pembukaan yang terlalu umum/klise.
 B. Tujuan
-(Sebutkan minimal 3 tujuan)
+   Sebutkan minimal 3 tujuan spesifik menggunakan kata kerja operasional (contoh: meningkatkan, menyusun, memahami).
 C. Manfaat
-(Jelaskan manfaat bagi peserta dan siswa)
+   Jelaskan manfaat praktis bagi Guru (peserta), Sekolah, dan Siswa secara konkret.
 
 BAB II: PELAKSANAAN KEGIATAN
 A. Waktu dan Tempat
-(Sebutkan waktu dan tempat pelaksanaan)
+   Tulis narasi waktu dan tempat pelaksanaan: "Kegiatan dilaksanakan pada ${input.periode}, bertempat di ${input.tempat || '[Lokasi standar/Sekretariat KKG]'} dimulai pukul 08.00 WIB s.d. selesai."
 B. Materi Kegiatan
-(Jelaskan inti materi yang disampaikan)
+   Uraikan inti materi yang dibahas secara substansial${input.tema ? ` sesuai dengan tema "${input.tema}"` : ''}. Jika Workshop, jelaskan produk yang dihasilkan. Jika Rapat, jelaskan agenda utamanya.
 C. Narasumber dan Peserta
-(Sebutkan siapa narasumber dan pesertanya)
+   Narasumber: ${input.narasumber || '[Sebutkan peran narasumber yang relevan, misal Pengawas atau Fasilitator]'}.
+   Peserta: Seluruh guru kelas/mapel anggota KKG Gugus 3 Wanayasa.
 
 BAB III: HASIL KEGIATAN
 A. Uraian Jalannya Kegiatan
-(Ceritakan alur kegiatan dari awal sampai akhir secara naratif)
+   Deskripsikan alur kegiatan dari pembukaan, penyampaian materi (disertai sesi tanya jawab interaktif), diskusi kelompok (jika ada), hingga penutupan. Buat narasi seolah reportase kegiatan nyata.
 B. Tindak Lanjut
-(Rencana implementasi hasil kegiatan)
+   Jelaskan rencana aksi pasca-kegiatan (misal: implementasi di kelas, diseminasi ke rekan sejawat, atau monitoring oleh Kepala Sekolah).
 C. Dampak
-(Dampak positif yang diharapkan)
+   Analisis dampak positif jangka pendek maupun panjang terhadap kualitas pembelajaran di Gugus 3.
 
 BAB IV: PENUTUP
 A. Simpulan
-(Kesimpulan singkat)
+   Ringkasan padat mengenai ketercapaian tujuan kegiatan.
 B. Saran
-(Masukan untuk kegiatan selanjutnya)
+   Rekomendasi konstruktif untuk panitia atau kegiatan berikutnya (misal: manajemen waktu, sarana prasarana, atau topik materi lanjutan).
 
-=== PENTING ===
-1. JANGAN gunakan format Markdown (**bold**, *italic*, # heading). GUNAKAN TEKS BIASA.
-2. Tulis JUDUL BAB dengan HURUF KAPITAL SEMUA.
-3. Tulis JUDUL SUB-BAB persis seperti contoh (Huruf Kapital di Awal Kata). Sistem akan error jika Anda menulis "1. Latar Belakang" atau "a. Latar belakang". HARUS "A. Latar Belakang".
-4. Selesaikan seluruh BAB. Jangan berhenti di tengah jalan.
-`;
+*** ATURAN FORMAT TEKNIS (PENTING) ***
+1. JANGAN gunakan format Markdown (**bold**, *italic*, # heading) sama sekali. Gunakan TEKS BIASA.
+2. Gunakan JUDUL BAB dan JUDUL SUB-BAB PERSIS seperti contoh di atas (Huruf Kapital pada awal kata untuk Sub-bab).
+3. Langsung mulai dari "BAB I: PENDAHULUAN". Tidak perlu ada kata pengantar dari AI.
+4. Pastikan setiap poin pembahasan terisi dengan paragraf yang utuh dan bermakna.`;
 }
