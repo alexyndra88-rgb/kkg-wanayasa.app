@@ -13,11 +13,5 @@
       "database_id": "c82b3f88-502d-4bc5-a7fa-2aa651928399"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "BUCKET",
-      "bucket_name": "kkg-files",
-      "preview_bucket_name": "kkg-files-preview"
-    }
-  ]
+  "r2_buckets": []
 }
