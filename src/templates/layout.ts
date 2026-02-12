@@ -3,66 +3,74 @@ const APP_VERSION = Date.now().toString(36);
 
 export function renderHTML(): string {
   return `<!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="scroll-smooth">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Digital KKG Gugus 3 Wanayasa</title>
   <meta name="description" content="Portal Digital Kelompok Kerja Guru (KKG) Gugus 3 Kecamatan Wanayasa, Kabupaten Purwakarta">
+  <meta name="theme-color" content="#4f46e5">
+  
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Icons -->
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css" rel="stylesheet">
+  
+  <!-- Fonts (Preload for performance) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <!-- DOCX Export Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/docx@7.1.0/build/index.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  
   <!-- Chart.js for Statistics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Outfit', 'sans-serif'],
+          },
           colors: {
-            primary: { 50:'#ecfdf5',100:'#d1fae5',200:'#a7f3d0',300:'#6ee7b7',400:'#34d399',500:'#10b981',600:'#059669',700:'#047857',800:'#065f46',900:'#064e3b' },
-            secondary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
-            accent: { 50:'#f0f9ff',100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e' }
+            // Premium Indigo Palette
+            primary: { 
+              50:'#eef2ff', 100:'#e0e7ff', 200:'#c7d2fe', 300:'#a5b4fc', 
+              400:'#818cf8', 500:'#6366f1', 600:'#4f46e5', 700:'#4338ca', 
+              800:'#3730a3', 900:'#312e81', 950:'#1e1b4b' 
+            },
+            // Rich Violet Accents
+            secondary: { 
+              50:'#f5f3ff', 100:'#ede9fe', 200:'#ddd6fe', 300:'#c4b5fd', 
+              400:'#a78bfa', 500:'#8b5cf6', 600:'#7c3aed', 700:'#6d28d9', 
+              800:'#5b21b6', 900:'#4c1d95', 950:'#2e1065' 
+            }
           }
         }
       }
     }
   </script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    .gradient-bg { background: linear-gradient(135deg, #1e3a8a 0%, #065f46 50%, #0c4a6e 100%); }
-    .gradient-card { background: linear-gradient(135deg, #ecfdf5 0%, #eff6ff 100%); }
-    .glass { background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); }
-    .fade-in { animation: fadeIn 0.3s ease-in; }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #2563eb; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; }
-    @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
-    .nav-active { background: rgba(255,255,255,0.15); border-bottom: 2px solid #34d399; }
-    .toast { position:fixed; top:20px; right:20px; z-index:9999; padding:12px 24px; border-radius:8px; color:#fff; font-weight:500; animation: slideIn 0.3s ease; }
-    @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
-    .toast-success { background:#059669; }
-    .toast-error { background:#dc2626; }
-    .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:50; display:flex; align-items:center; justify-content:center; }
-    .modal-content { background:#fff; border-radius:12px; max-width:600px; width:90%; max-height:90vh; overflow-y:auto; padding:24px; }
-    .tab-active { color: #2563eb; border-bottom: 2px solid #2563eb; }
-    [x-cloak] { display: none !important; }
-    .mobile-menu { transform: translateX(-100%); transition: transform 0.3s ease; }
-    .mobile-menu.open { transform: translateX(0); }
-    .surat-preview { white-space: pre-wrap; font-family: 'Times New Roman', serif; line-height: 1.8; }
-    .proker-preview { white-space: pre-wrap; font-family: 'Times New Roman', serif; line-height: 1.8; }
-  </style>
+  
   <link rel="stylesheet" href="/static/style.css?v=${APP_VERSION}">
 </head>
-<body class="bg-gray-50 min-h-screen text-gray-800">
+<body class="bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] antialiased transition-colors duration-300 selection:bg-primary-500 selection:text-white">
   <div id="app">
-    <!-- Initial Loading State (before JS loads) -->
-    <div class="fixed inset-0 flex items-center justify-center bg-gray-50 z-50">
-      <div class="text-center">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p class="text-gray-500 font-medium">Memuat Aplikasi...</p>
+    <!-- Initial Loading State (Premium) -->
+    <div class="fixed inset-0 flex flex-col items-center justify-center bg-[var(--color-bg-primary)] z-50">
+      <div class="relative mb-6">
+        <div class="w-16 h-16 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+        <div class="absolute inset-0 flex items-center justify-center">
+            <i class="fas fa-shapes text-primary-600 text-xl animate-pulse"></i>
+        </div>
       </div>
+      <h2 class="text-xl font-display font-bold text-[var(--color-text-primary)] tracking-tight mb-2">KKG Portal</h2>
+      <p id="loading-status" class="text-sm text-[var(--color-text-tertiary)] font-medium animate-pulse">Memuat Aplikasi...</p>
     </div>
   </div>
   
@@ -81,3 +89,5 @@ export function renderHTML(): string {
 </body>
 </html>`;
 }
+
+

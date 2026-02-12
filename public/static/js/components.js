@@ -6,6 +6,9 @@ import { escapeHtml, avatar, badge } from './utils.js';
  * Render navigation bar
  */
 export function renderNavbar() {
+  // Navbar is mostly replaced by Sidebar in main.js layouts, 
+  // but kept here for fallback or specific layouts if needed.
+  // We'll update it to match the new design system just in case.
   const isLoggedIn = !!state.user;
   const isAdmin = state.user?.role === 'admin';
 
@@ -31,17 +34,17 @@ export function renderNavbar() {
   });
 
   return `
-    <nav class="bg-gradient-to-r from-blue-900 via-indigo-900 to-purple-900 shadow-xl sticky top-0 z-50">
+    <nav class="bg-[var(--color-bg-elevated)] border-b border-[var(--color-border-subtle)] sticky top-0 z-50 backdrop-blur-md bg-opacity-90">
       <div class="max-w-7xl mx-auto px-4">
         <div class="flex items-center justify-between h-16">
           <!-- Logo -->
           <a href="#" onclick="navigate('home'); return false;" class="flex items-center space-x-3 group">
-            <div class="bg-white/10 p-2 rounded-xl group-hover:bg-white/20 transition-colors">
-              <i class="fas fa-graduation-cap text-yellow-400 text-xl"></i>
+            <div class="w-8 h-8 flex items-center justify-center bg-primary-50 dark:bg-primary-900/30 rounded-lg text-primary-600">
+              <i class="fas fa-shapes"></i>
             </div>
             <div class="hidden sm:block">
-              <div class="text-white font-bold">Portal KKG</div>
-              <div class="text-blue-200 text-xs">Gugus 3 Wanayasa</div>
+              <div class="font-display font-bold text-[var(--color-text-primary)]">Portal KKG</div>
+              <div class="text-[var(--color-text-tertiary)] text-xs">Gugus 3 Wanayasa</div>
             </div>
           </a>
 
@@ -50,9 +53,9 @@ export function renderNavbar() {
             ${filteredLinks.map(link => `
               <button 
                 onclick="navigate('${link.page}')"
-                class="nav-link px-3 py-2 rounded-lg text-sm font-medium transition-all ${state.currentPage === link.page
-      ? 'bg-white/20 text-white'
-      : 'text-blue-100 hover:bg-white/10 hover:text-white'
+                class="px-3 py-2 rounded-lg text-sm font-medium transition-all ${state.currentPage === link.page
+      ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600'
+      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-[var(--color-text-primary)]'
     }"
               >
                 <i class="fas ${link.icon} mr-1.5 text-xs"></i>
@@ -64,72 +67,57 @@ export function renderNavbar() {
           <!-- User Menu -->
           <div class="flex items-center space-x-3">
             ${isLoggedIn ? `
-              <!-- User Avatar Dropdown -->
               <div class="relative group">
-                <button class="flex items-center space-x-2 bg-white/10 rounded-xl px-3 py-2 hover:bg-white/20 transition-colors">
+                <button class="flex items-center space-x-2 p-1 pr-3 rounded-full hover:bg-[var(--color-bg-tertiary)] transition-colors border border-transparent hover:border-[var(--color-border-subtle)]">
                   ${avatar(state.user.nama, 'sm', state.user.foto_url)}
-                  <span class="hidden sm:block text-white text-sm font-medium max-w-[120px] truncate">
+                  <span class="hidden sm:block text-[var(--color-text-primary)] text-sm font-medium max-w-[120px] truncate">
                     ${escapeHtml(state.user.nama)}
                   </span>
-                  <i class="fas fa-chevron-down text-white/70 text-xs"></i>
+                  <i class="fas fa-chevron-down text-[var(--color-text-tertiary)] text-xs"></i>
                 </button>
-                <!-- Dropdown Menu -->
-                <div class="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all transform origin-top-right scale-95 group-hover:scale-100">
-                  <div class="px-4 py-2 border-b border-gray-100">
-                    <p class="text-sm font-medium text-gray-800 truncate">${escapeHtml(state.user.nama)}</p>
-                    <p class="text-xs text-gray-500 truncate">${escapeHtml(state.user.email)}</p>
-                    ${isAdmin ? `<span class="inline-block mt-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">Admin</span>` : ''}
+                <div class="absolute right-0 top-full mt-2 w-56 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-xl shadow-xl py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all transform origin-top-right scale-95 group-hover:scale-100 z-50">
+                  <div class="px-4 py-3 border-b border-[var(--color-border-subtle)]">
+                    <p class="text-sm font-bold text-[var(--color-text-primary)] truncate">${escapeHtml(state.user.nama)}</p>
+                    <p class="text-xs text-[var(--color-text-secondary)] truncate">${escapeHtml(state.user.email)}</p>
+                    ${isAdmin ? `<span class="inline-block mt-1.5 px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-[10px] font-bold uppercase tracking-wider rounded-full">Administrator</span>` : ''}
                   </div>
-                  <button onclick="navigate('profile')" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                    <i class="fas fa-user mr-2 text-gray-400"></i>Profil Saya
+                  <button onclick="navigate('profile')" class="w-full text-left px-4 py-2.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-primary-600 flex items-center gap-2">
+                    <i class="fas fa-user w-4"></i>Profil Saya
                   </button>
-                  <button onclick="logout()" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                    <i class="fas fa-sign-out-alt mr-2"></i>Keluar
+                  <button onclick="logout()" class="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-2">
+                    <i class="fas fa-sign-out-alt w-4"></i>Keluar
                   </button>
                 </div>
               </div>
             ` : `
-              <button 
-                onclick="navigate('login')"
-                class="bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 px-4 py-2 rounded-xl font-medium hover:from-yellow-300 hover:to-orange-400 transition-all shadow-lg"
-              >
+              <button onclick="navigate('login')" class="btn btn-primary text-sm px-4 py-2 shadow-lg shadow-primary-500/20">
                 <i class="fas fa-sign-in-alt mr-2"></i>Masuk
               </button>
             `}
             
-            <!-- Theme Toggle Button -->
-            <button 
-              onclick="toggleTheme()"
-              class="bg-white/10 p-2 rounded-xl hover:bg-white/20 transition-colors"
-              aria-label="Toggle dark mode"
-              title="Toggle dark mode"
-            >
-              <i class="fas fa-moon text-white dark:hidden"></i>
+            <button onclick="toggleTheme()" class="theme-toggle" aria-label="Toggle dark mode">
+              <i class="fas fa-moon text-[var(--color-text-secondary)] dark:hidden"></i>
               <i class="fas fa-sun text-yellow-400 hidden dark:inline"></i>
             </button>
             
-            <!-- Mobile Menu Button -->
-            <button 
-              onclick="toggleMobileMenu()"
-              class="lg:hidden bg-white/10 p-2 rounded-xl hover:bg-white/20 transition-colors"
-            >
-              <i class="fas fa-bars text-white"></i>
+            <button onclick="toggleMobileMenu()" class="lg:hidden p-2 rounded-xl text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] transition-colors">
+              <i class="fas fa-bars text-xl"></i>
             </button>
           </div>
         </div>
 
         <!-- Mobile Navigation -->
-        <div id="mobile-menu" class="lg:hidden hidden pb-4">
-          <div class="bg-white/10 rounded-xl p-2 mt-2 space-y-1">
+        <div id="mobile-menu" class="lg:hidden hidden pb-4 border-t border-[var(--color-border-subtle)] mt-2 pt-2 animate-fade-in">
+          <div class="space-y-1">
             ${filteredLinks.map(link => `
               <button 
                 onclick="navigate('${link.page}'); toggleMobileMenu();"
                 class="w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-all ${state.currentPage === link.page
-        ? 'bg-white/20 text-white'
-        : 'text-blue-100 hover:bg-white/10 hover:text-white'
+        ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-600'
+        : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
       }"
               >
-                <i class="fas ${link.icon} mr-3 w-4"></i>
+                <i class="fas ${link.icon} mr-3 w-5 text-center"></i>
                 ${link.label}
               </button>
             `).join('')}
@@ -155,58 +143,64 @@ export function toggleMobileMenu() {
  */
 export function renderFooter() {
   return `
-    <footer class="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white mt-auto">
+    <footer class="bg-[var(--color-bg-elevated)] border-t border-[var(--color-border-subtle)] mt-auto text-[var(--color-text-secondary)]">
       <div class="max-w-7xl mx-auto px-4 py-12">
         <div class="grid md:grid-cols-4 gap-8">
           <!-- About -->
           <div class="md:col-span-2">
             <div class="flex items-center space-x-3 mb-4">
-              <div class="bg-white/10 p-2 rounded-xl">
-                <i class="fas fa-graduation-cap text-yellow-400 text-xl"></i>
+              <div class="w-10 h-10 bg-primary-50 dark:bg-primary-900/30 rounded-lg flex items-center justify-center text-primary-600">
+                <i class="fas fa-shapes text-xl"></i>
               </div>
               <div>
-                <div class="font-bold">Portal Digital KKG</div>
-                <div class="text-gray-400 text-sm">Gugus 3 Kecamatan Wanayasa</div>
+                <div class="font-display font-bold text-[var(--color-text-primary)] text-lg">Portal KKG</div>
+                <div class="text-[var(--color-text-tertiary)] text-xs uppercase tracking-wider">Gugus 3 Kecamatan Wanayasa</div>
               </div>
             </div>
-            <p class="text-gray-400 text-sm leading-relaxed">
-              Platform digital untuk memfasilitasi koordinasi, kolaborasi, dan pengembangan 
-              profesional antar guru di lingkungan KKG Gugus 3 Kecamatan Wanayasa, 
-              Kabupaten Purwakarta.
+            <p class="text-[var(--color-text-secondary)] text-sm leading-relaxed max-w-md">
+              Platform kolaborasi digital untuk memfasilitasi koordinasi, pengembangan kompetensi, dan sinergi antar guru untuk kemajuan pendidikan Indonesia.
             </p>
           </div>
 
           <!-- Quick Links -->
           <div>
-            <h4 class="font-semibold mb-4">Tautan Cepat</h4>
-            <ul class="space-y-2 text-sm">
-              <li><a href="#" onclick="navigate('pengumuman'); return false;" class="text-gray-400 hover:text-white transition-colors">Pengumuman</a></li>
-              <li><a href="#" onclick="navigate('materi'); return false;" class="text-gray-400 hover:text-white transition-colors">Repository Materi</a></li>
-              <li><a href="#" onclick="navigate('guru'); return false;" class="text-gray-400 hover:text-white transition-colors">Direktori Guru</a></li>
-              <li><a href="#" onclick="navigate('forum'); return false;" class="text-gray-400 hover:text-white transition-colors">Forum Diskusi</a></li>
+            <h4 class="font-bold text-[var(--color-text-primary)] mb-4">Tautan Cepat</h4>
+            <ul class="space-y-2.5 text-sm">
+              <li><button onclick="navigate('pengumuman')" class="hover:text-primary-600 transition-colors flex items-center gap-2"><i class="fas fa-angle-right text-xs opacity-50"></i> Pengumuman</button></li>
+              <li><button onclick="navigate('materi')" class="hover:text-primary-600 transition-colors flex items-center gap-2"><i class="fas fa-angle-right text-xs opacity-50"></i> Repository Materi</button></li>
+              <li><button onclick="navigate('guru')" class="hover:text-primary-600 transition-colors flex items-center gap-2"><i class="fas fa-angle-right text-xs opacity-50"></i> Direktori Guru</button></li>
+              <li><button onclick="navigate('forum')" class="hover:text-primary-600 transition-colors flex items-center gap-2"><i class="fas fa-angle-right text-xs opacity-50"></i> Forum Diskusi</button></li>
             </ul>
           </div>
 
           <!-- Contact -->
           <div>
-            <h4 class="font-semibold mb-4">Kontak</h4>
-            <ul class="space-y-2 text-sm text-gray-400">
-              <li class="flex items-start space-x-2">
-                <i class="fas fa-map-marker-alt mt-1 text-yellow-400"></i>
-                <span class="max-w-[200px]">${escapeHtml(state.settings?.alamat_sekretariat || 'SDN 1 Wanayasa, Kec. Wanayasa, Kab. Purwakarta')}</span>
+            <h4 class="font-bold text-[var(--color-text-primary)] mb-4">Hubungi Kami</h4>
+            <ul class="space-y-3 text-sm">
+              <li class="flex items-start gap-3">
+                <i class="fas fa-map-marker-alt mt-1 text-primary-500"></i>
+                <span>${escapeHtml(state.settings?.alamat_sekretariat || 'SDN 1 Wanayasa, Jl. Raya Wanayasa No. 12, Purwakarta')}</span>
               </li>
-              <li class="flex items-center space-x-2">
-                <i class="fas fa-envelope text-yellow-400"></i>
-                <span>${escapeHtml(state.settings?.email || 'admin@kkg-wanayasa.id')}</span>
+              <li class="flex items-center gap-3">
+                <i class="fas fa-envelope text-primary-500"></i>
+                <span>${escapeHtml(state.settings?.email || 'sekretariat@kkg-wanayasa.id')}</span>
+              </li>
+              <li class="flex items-center gap-3">
+                <i class="fab fa-whatsapp text-primary-500"></i>
+                <span>+62 812-3456-7890</span>
               </li>
             </ul>
           </div>
         </div>
 
         <!-- Copyright -->
-        <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-500 text-sm">
-          <p>&copy; ${new Date().getFullYear()} Portal Digital KKG Gugus 3 Wanayasa. All rights reserved.</p>
-          <p class="mt-1">Dibuat dengan <i class="fas fa-heart text-red-500"></i> untuk Pendidikan Indonesia</p>
+        <div class="border-t border-[var(--color-border-subtle)] mt-10 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-[var(--color-text-tertiary)]">
+          <p>&copy; ${new Date().getFullYear()} KKG Gugus 3 Wanayasa. All rights reserved.</p>
+          <div class="flex items-center gap-1 mt-2 md:mt-0">
+             <span>Made with</span>
+             <i class="fas fa-heart text-red-500 animate-pulse"></i>
+             <span>for Education</span>
+          </div>
         </div>
       </div>
     </footer>
@@ -238,10 +232,10 @@ export function pageHeader(title, subtitle = '', actions = '') {
 export function card(content, options = {}) {
   const { className = '', header = '', footer = '', hover = false } = options;
   return `
-    <div class="bg-white rounded-2xl shadow-lg overflow-hidden ${hover ? 'hover:shadow-xl transition-shadow' : ''} ${className}">
-      ${header ? `<div class="px-6 py-4 border-b border-gray-100">${header}</div>` : ''}
-      <div class="p-6">${content}</div>
-      ${footer ? `<div class="px-6 py-4 bg-gray-50 border-t border-gray-100">${footer}</div>` : ''}
+    <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-2xl shadow-sm overflow-hidden ${hover ? 'hover:shadow-lg hover:border-primary-300 transition-all duration-300' : ''} ${className}">
+      ${header ? `<div class="px-6 py-4 border-b border-[var(--color-border-subtle)] font-bold text-[var(--color-text-primary)]">${header}</div>` : ''}
+      <div class="p-6 text-[var(--color-text-primary)]">${content}</div>
+      ${footer ? `<div class="px-6 py-4 bg-[var(--color-bg-tertiary)] border-t border-[var(--color-border-subtle)]">${footer}</div>` : ''}
     </div>
   `;
 }
@@ -329,26 +323,26 @@ export function button(label, options = {}) {
     className = ''
   } = options;
 
-  const types = {
-    primary: 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700',
-    secondary: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-    success: 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700',
-    danger: 'bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700',
-    warning: 'bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 hover:from-yellow-500 hover:to-orange-600',
-    ghost: 'bg-transparent text-gray-600 hover:bg-gray-100'
+  const typeClasses = {
+    primary: 'btn-primary',
+    secondary: 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] hover:bg-[var(--color-border-strong)]',
+    success: 'bg-green-500 text-white hover:bg-green-600 shadow-md shadow-green-500/20',
+    danger: 'bg-red-500 text-white hover:bg-red-600 shadow-md shadow-red-500/20',
+    warning: 'bg-amber-400 text-black hover:bg-amber-500 shadow-md shadow-amber-400/20',
+    ghost: 'bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-primary-600'
   };
 
-  const sizes = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2.5',
-    lg: 'px-6 py-3 text-lg'
+  const sizeClasses = {
+    sm: 'px-3 py-1.5 text-xs',
+    md: 'px-5 py-2.5 text-sm',
+    lg: 'px-7 py-3.5 text-base'
   };
 
   return `
     <button 
       ${onclick ? `onclick="${onclick}"` : ''}
       ${disabled || loading ? 'disabled' : ''}
-      class="inline-flex items-center justify-center ${sizes[size]} ${types[type]} rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${className}"
+      class="btn ${sizeClasses[size]} ${typeClasses[type]} ${className} disabled:opacity-50 disabled:cursor-not-allowed"
     >
       ${loading ? '<i class="fas fa-spinner fa-spin mr-2"></i>' : (icon ? `<i class="fas ${icon} mr-2"></i>` : '')}
       ${escapeHtml(label)}

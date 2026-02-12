@@ -193,14 +193,17 @@ export function hideLoading() {
 /**
  * Empty state component
  */
-export function emptyState(icon = 'fa-inbox', title = 'Tidak ada data', subtitle = '') {
+export function emptyState(icon = 'fa-inbox', title = 'Tidak ada data', subtitle = 'Belum ada data yang tersedia saat ini.') {
   return `
-    <div class="text-center py-16">
-      <div class="inline-flex items-center justify-center w-20 h-20 bg-gray-100 rounded-full mb-6">
-        <i class="fas ${icon} text-4xl text-gray-400"></i>
+    <div class="flex flex-col items-center justify-center py-16 px-4 animate-fade-in text-center">
+      <div class="relative mb-6">
+        <div class="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center z-10 relative">
+          <i class="fas ${icon} text-4xl text-gray-400 dark:text-gray-500"></i>
+        </div>
+        <div class="absolute top-0 left-0 w-full h-full bg-blue-500/10 rounded-full blur-xl animate-pulse"></div>
       </div>
-      <h3 class="text-xl font-medium text-gray-600 mb-2">${escapeHtml(title)}</h3>
-      ${subtitle ? `<p class="text-gray-400">${escapeHtml(subtitle)}</p>` : ''}
+      <h3 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">${escapeHtml(title)}</h3>
+      <p class="text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed">${escapeHtml(subtitle)}</p>
     </div>
   `;
 }
@@ -209,13 +212,13 @@ export function emptyState(icon = 'fa-inbox', title = 'Tidak ada data', subtitle
  * Skeleton loader for list items
  */
 export function skeletonList(count = 3) {
-  return Array(count).fill(`
-    <div class="animate-pulse bg-white rounded-xl p-4 mb-3">
+  return Array(count).fill(0).map((_, i) => `
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-4 mb-3 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden" style="animation-delay: ${i * 100}ms">
       <div class="flex space-x-4">
-        <div class="w-12 h-12 bg-gray-200 rounded-full"></div>
-        <div class="flex-1 space-y-2">
-          <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-          <div class="h-3 bg-gray-200 rounded w-1/2"></div>
+        <div class="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full shrink-0 skeleton-shimmer"></div>
+        <div class="flex-1 space-y-3 py-1">
+          <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 skeleton-shimmer"></div>
+          <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 skeleton-shimmer"></div>
         </div>
       </div>
     </div>
@@ -226,15 +229,37 @@ export function skeletonList(count = 3) {
  * Skeleton loader for cards
  */
 export function skeletonCards(count = 3) {
-  return Array(count).fill(`
-    <div class="animate-pulse bg-white rounded-xl p-6">
-      <div class="h-4 bg-gray-200 rounded w-2/3 mb-4"></div>
-      <div class="space-y-2">
-        <div class="h-3 bg-gray-200 rounded"></div>
-        <div class="h-3 bg-gray-200 rounded w-5/6"></div>
-        <div class="h-3 bg-gray-200 rounded w-4/6"></div>
+  return Array(count).fill(0).map((_, i) => `
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden h-full flex flex-col" style="animation-delay: ${i * 100}ms">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg skeleton-shimmer"></div>
+        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 skeleton-shimmer"></div>
+      </div>
+      <div class="space-y-3 flex-1">
+        <div class="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2 skeleton-shimmer"></div>
+        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full skeleton-shimmer"></div>
+        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-5/6 skeleton-shimmer"></div>
+      </div>
+      <div class="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between">
+        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4 skeleton-shimmer"></div>
+        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4 skeleton-shimmer"></div>
       </div>
     </div>
+  `).join('');
+}
+
+/**
+ * Skeleton loader for table rows
+ */
+export function skeletonTable(cols = 4, rows = 5) {
+  return Array(rows).fill(0).map((_, i) => `
+    <tr>
+      ${Array(cols).fill(0).map(() => `
+        <td class="px-4 py-3">
+          <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded skeleton-shimmer" style="width: ${Math.floor(Math.random() * 40 + 60)}%"></div>
+        </td>
+      `).join('')}
+    </tr>
   `).join('');
 }
 

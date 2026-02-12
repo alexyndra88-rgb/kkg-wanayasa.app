@@ -231,6 +231,23 @@ CREATE INDEX IF NOT EXISTS idx_sekolah_tipe ON sekolah(tipe);
       await c.env.DB.prepare(stmt).run();
     }
 
+    // Migration: Add missing columns to absensi table if they don't exist
+    try {
+      await c.env.DB.prepare("ALTER TABLE absensi ADD COLUMN status TEXT DEFAULT 'hadir'").run();
+    } catch (e) { /* ignore if column exists */ }
+
+    try {
+      await c.env.DB.prepare("ALTER TABLE absensi ADD COLUMN latitude REAL").run();
+    } catch (e) { /* ignore */ }
+
+    try {
+      await c.env.DB.prepare("ALTER TABLE absensi ADD COLUMN longitude REAL").run();
+    } catch (e) { /* ignore */ }
+
+    try {
+      await c.env.DB.prepare("ALTER TABLE absensi ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP").run();
+    } catch (e) { /* ignore */ }
+
     // Hash password with new PBKDF2 method
     const adminPasswordHash = await hashPassword('admin123');
 

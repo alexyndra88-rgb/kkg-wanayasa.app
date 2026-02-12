@@ -94,7 +94,12 @@ export async function api(path, options = {}) {
     }
 
     try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        mergedOptions.signal = controller.signal;
+
         const response = await fetch(url, mergedOptions);
+        clearTimeout(id);
 
         // Handle rate limiting
         if (response.status === 429) {

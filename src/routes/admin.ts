@@ -240,6 +240,68 @@ admin.post('/settings/logo', async (c) => {
   }
 });
 
+// Create new user (admin only)
+admin.post('/users', async (c) => {
+  try {
+    const body = await c.req.json();
+    const currentUser: any = c.get('user');
+    const { nama, email, password, role = 'user', sekolah, nip } = body;
+
+    const validation = validateRequired(body, ['nama', 'email', 'password']);
+    if (!validation.valid) {
+      return Errors.validation(c, `Field berikut harus diisi: ${validation.missing.join(', ')}`);
+    }
+
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return Errors.validation(c, 'Format email tidak valid');
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return Errors.validation(c, passwordValidation.message);
+    }
+
+    // Check if email exists
+    const existing = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+    if (existing) {
+      return Errors.conflict(c, 'Email sudah terdaftar');
+    }
+
+    const passwordHash = await hashPassword(password);
+
+    const result = await c.env.DB.prepare(`
+      INSERT INTO users (nama, email, password_hash, role, sekolah, nip, is_approved, approved_at, approved_by)
+      VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), ?)
+    `).bind(
+      nama,
+      email.toLowerCase(),
+      passwordHash,
+      role,
+      sekolah || null,
+      nip || null,
+      currentUser.id
+    ).run();
+
+    // Audit log
+    await createAuditLog(c.env.DB, {
+      user_id: currentUser.id,
+      action: 'USER_CREATE',
+      entity_type: 'user',
+      entity_id: result.meta.last_row_id,
+      details: { name: nama, email, role },
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
+      user_agent: c.req.header('User-Agent')
+    });
+
+    return successResponse(c, { id: result.meta.last_row_id }, 'User berhasil dibuat', 201);
+  } catch (e: any) {
+    console.error('Create user error:', e);
+    return Errors.internal(c);
+  }
+});
+
 // Get all users
 admin.get('/users', async (c) => {
   try {

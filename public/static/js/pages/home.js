@@ -13,121 +13,156 @@ export async function renderHome() {
   return `
   <div class="fade-in">
     <!-- Hero Section -->
-    <section class="gradient-bg text-white py-16 md:py-24 relative overflow-hidden">
-      <div class="absolute inset-0 opacity-10">
-        <div class="absolute top-10 left-10 w-32 h-32 border-2 border-white rounded-full"></div>
-        <div class="absolute bottom-10 right-10 w-48 h-48 border-2 border-white rounded-full"></div>
-        <div class="absolute top-1/2 left-1/3 w-20 h-20 border border-white rounded-full"></div>
+    <section class="bg-gradient-to-r from-blue-900 to-emerald-900 text-white py-20 md:py-32 relative overflow-hidden">
+      <!-- Decor & Shapes -->
+      <div class="absolute inset-0 pointer-events-none">
+        <div class="absolute top-0 right-0 w-[800px] h-[800px] bg-emerald-500 opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-500 opacity-10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 mix-blend-overlay"></div>
       </div>
-      <div class="max-w-7xl mx-auto px-4 relative z-10">
-        <div class="text-center">
-          <div class="inline-block px-4 py-1 bg-white/10 rounded-full text-sm font-medium text-green-300 mb-6">
-            <i class="fas fa-school mr-2"></i>Kabupaten Purwakarta, Jawa Barat
-          </div>
-          <h1 class="text-3xl md:text-5xl lg:text-6xl font-extrabold mb-4 leading-tight">
-            Portal Digital<br>
-            <span class="text-green-300">KKG Gugus 3 Wanayasa</span>
-          </h1>
-          <p class="text-lg md:text-xl text-gray-200 max-w-2xl mx-auto mb-8">
-            Platform kolaborasi digital untuk Kelompok Kerja Guru Gugus 3 Kecamatan Wanayasa. 
-            Bersama memajukan mutu pendidikan.
-          </p>
-          <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <button onclick="navigate('surat')" class="px-8 py-3 bg-green-500 hover:bg-green-600 rounded-xl font-bold text-lg transition shadow-lg shadow-green-500/30">
-              <i class="fas fa-envelope mr-2"></i>Buat Surat Undangan
-            </button>
-            <button onclick="navigate('proker')" class="px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/30 rounded-xl font-bold text-lg transition">
-              <i class="fas fa-clipboard-list mr-2"></i>Buat Program Kerja
-            </button>
-          </div>
+
+      <div class="max-w-7xl mx-auto px-4 relative z-10 text-center">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full text-sm font-medium text-emerald-100 border border-white/10 mb-8 shadow-lg">
+          <i class="fas fa-map-marker-alt text-emerald-400"></i>
+          <span>Kabupaten Purwakarta, Jawa Barat</span>
+        </div>
+        
+        <h1 class="text-4xl md:text-6xl lg:text-7xl font-display font-extrabold mb-6 leading-tight tracking-tight drop-shadow-sm">
+          Portal Digital<br>
+          <span class="text-white">KKG Gugus 3 Wanayasa</span>
+        </h1>
+        
+        <p class="text-lg md:text-xl text-emerald-50 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
+          Platform kolaborasi digital untuk Kelompok Kerja Guru Gugus 3 Kecamatan Wanayasa. Bersama memajukan mutu pendidikan.
+        </p>
+        
+        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          ${state.user ? `
+          <button onclick="navigate('surat')" class="btn bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 text-lg shadow-xl shadow-emerald-900/20 hover:scale-105 transition-transform duration-300 border border-emerald-400/20 rounded-xl font-bold">
+            <i class="fas fa-envelope mr-3"></i>Buat Surat Undangan
+          </button>
+          <button onclick="navigate('proker')" class="btn bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-sm px-8 py-3 text-lg transition-all duration-300 rounded-xl font-medium">
+            <i class="fas fa-file-alt mr-3"></i>Buat Program Kerja
+          </button>
+          ` : `
+          <button onclick="navigate('login')" class="btn bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 text-lg shadow-xl shadow-emerald-900/20 font-bold border-none rounded-xl">
+            <i class="fas fa-sign-in-alt mr-3"></i>Masuk Portal
+          </button>
+          <button onclick="navigate('pengumuman')" class="btn bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-sm px-8 py-3 text-lg transition-all duration-300 rounded-xl">
+            <i class="fas fa-bullhorn mr-3"></i>Lihat Pengumuman
+          </button>
+          `}
         </div>
       </div>
     </section>
 
-    <!-- Visi Misi -->
-    <section class="py-12 bg-white">
-      <div class="max-w-7xl mx-auto px-4">
+    <!-- Stats / Vision Grid -->
+    <section class="py-16 md:py-24 -mt-10 relative z-20 px-4">
+      <div class="max-w-7xl mx-auto">
         <div class="grid md:grid-cols-2 gap-8">
-          <div class="gradient-card rounded-2xl p-8 border border-green-100">
-            <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mb-4">
-              <i class="fas fa-eye text-2xl text-green-600"></i>
-            </div>
-            <h3 class="text-2xl font-bold text-gray-800 mb-3">Visi</h3>
-            <p class="text-gray-600 leading-relaxed">Mewujudkan guru-guru yang profesional, kompeten, dan berdaya saing tinggi di Gugus 3 Kecamatan Wanayasa melalui kolaborasi dan pengembangan berkelanjutan.</p>
-          </div>
-          <div class="gradient-card rounded-2xl p-8 border border-blue-100">
-            <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-              <i class="fas fa-bullseye text-2xl text-blue-600"></i>
-            </div>
-            <h3 class="text-2xl font-bold text-gray-800 mb-3">Misi</h3>
-            <ul class="text-gray-600 space-y-2">
-              <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>Meningkatkan kompetensi guru melalui pelatihan dan workshop berkala</li>
-              <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>Memfasilitasi pertukaran ilmu dan pengalaman antar guru</li>
-              <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>Mendorong inovasi pembelajaran sesuai Kurikulum Merdeka</li>
-              <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-2 flex-shrink-0"></i>Memanfaatkan teknologi digital untuk administrasi pendidikan</li>
-            </ul>
-          </div>
+           <!-- Card Visi -->
+           <div class="gradient-card p-8 md:p-10 rounded-3xl shadow-xl card-hover relative overflow-hidden group">
+              <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
+                <i class="fas fa-eye text-9xl"></i>
+              </div>
+              <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+                <i class="fas fa-eye text-3xl"></i>
+              </div>
+              <h3 class="text-2xl font-display font-bold text-[var(--color-text-primary)] mb-4">Visi Kami</h3>
+              <p class="text-[var(--color-text-secondary)] leading-relaxed text-lg">
+                Mewujudkan komunitas guru yang <span class="text-primary-600 font-semibold">Inovatif</span>, <span class="text-primary-600 font-semibold">Profesional</span>, dan berdaya saing global melalui kolaborasi digital yang berkelanjutan.
+              </p>
+           </div>
+           
+           <!-- Card Misi -->
+           <div class="gradient-card p-8 md:p-10 rounded-3xl shadow-xl card-hover relative overflow-hidden group">
+              <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
+                <i class="fas fa-bullseye text-9xl"></i>
+              </div>
+              <div class="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+                <i class="fas fa-rocket text-3xl"></i>
+              </div>
+              <h3 class="text-2xl font-display font-bold text-[var(--color-text-primary)] mb-4">Misi Utama</h3>
+              <ul class="space-y-3 text-[var(--color-text-secondary)]">
+                <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-3 flex-shrink-0"></i><span>Meningkatkan kompetensi melalui <strong>Workshop & Pelatihan</strong>.</span></li>
+                <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-3 flex-shrink-0"></i><span>Memfasilitasi <strong>Sharing Best Practice</strong> antar guru.</span></li>
+                <li class="flex items-start"><i class="fas fa-check-circle text-green-500 mt-1 mr-3 flex-shrink-0"></i><span>Implementasi <strong>Kurikulum Merdeka</strong> berbasis digital.</span></li>
+              </ul>
+           </div>
         </div>
       </div>
     </section>
-
-    <!-- Quick Access -->
-    <section class="py-12">
-      <div class="max-w-7xl mx-auto px-4">
-        <h2 class="text-2xl font-bold text-gray-800 text-center mb-8">
-          <i class="fas fa-th-large text-blue-500 mr-2"></i>Akses Cepat
-        </h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    
+    <!-- Quick Access Grid -->
+    <section class="py-12 px-4">
+      <div class="max-w-7xl mx-auto">
+        <div class="flex items-center justify-between mb-10">
+          <h2 class="text-3xl font-display font-bold text-[var(--color-text-primary)]">
+            <span class="text-gradient">Akses Cepat</span>
+          </h2>
+          <div class="h-1 flex-1 bg-[var(--color-border-default)] ml-6 rounded-full opacity-50 hidden sm:block"></div>
+        </div>
+        
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
           ${[
-      { id: 'surat', icon: 'fa-envelope', color: 'bg-blue-500', label: 'Generator Surat', admin: true },
-      { id: 'proker', icon: 'fa-clipboard-list', color: 'bg-green-500', label: 'Program Kerja', admin: true },
-      { id: 'absensi', icon: 'fa-calendar-check', color: 'bg-purple-500', label: 'Absensi Digital', auth: true },
-      { id: 'materi', icon: 'fa-book', color: 'bg-orange-500', label: 'Repository Materi' },
-      { id: 'guru', icon: 'fa-users', color: 'bg-teal-500', label: 'Direktori Guru' },
-      { id: 'forum', icon: 'fa-comments', color: 'bg-pink-500', label: 'Forum Diskusi' },
-      { id: 'pengumuman', icon: 'fa-bullhorn', color: 'bg-yellow-500', label: 'Pengumuman' },
-      {
-        id: state.user ? 'profile' : 'login',
-        icon: state.user ? 'fa-user-circle' : 'fa-sign-in-alt',
-        color: state.user ? 'bg-indigo-600' : 'bg-gray-600',
-        label: state.user ? 'Profil Saya' : 'Login'
-      },
-    ].map(item => `
-            <button onclick="navigate('${item.id}')" class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-lg transition group border border-gray-100 relative overflow-hidden">
-              ${item.admin && (!state.user || state.user.role !== 'admin') ? '<div class="absolute top-2 right-2 text-gray-300"><i class="fas fa-lock"></i></div>' : ''}
-              <div class="w-12 h-12 ${item.color} rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition">
-                <i class="fas ${item.icon} text-white text-xl"></i>
+      { id: 'surat', icon: 'fa-magic', color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/20', label: 'Generator Surat', desc: 'Buat surat resmi instan' },
+      { id: 'proker', icon: 'fa-tasks', color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/20', label: 'Program Kerja', desc: 'Manajemen kegiatan' },
+      { id: 'absensi', icon: 'fa-user-check', color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/20', label: 'Absensi Digital', desc: 'Rekap kehadiran' },
+      { id: 'materi', icon: 'fa-book-reader', color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/20', label: 'E-Library', desc: 'Sumber belajar' },
+      { id: 'guru', icon: 'fa-chalkboard-teacher', color: 'text-cyan-600', bg: 'bg-cyan-100 dark:bg-cyan-900/20', label: 'Data Guru', desc: 'Direktori anggota' },
+      { id: 'forum', icon: 'fa-comments', color: 'text-pink-600', bg: 'bg-pink-100 dark:bg-pink-900/20', label: 'Forum Diskusi', desc: 'Ruang kolaborasi' },
+      { id: 'kalender', icon: 'fa-calendar-alt', color: 'text-indigo-600', bg: 'bg-indigo-100 dark:bg-indigo-900/20', label: 'Agenda KKG', desc: 'Jadwal kegiatan' },
+      { id: 'laporan', icon: 'fa-file-signature', color: 'text-yellow-600', bg: 'bg-yellow-100 dark:bg-yellow-900/20', label: 'Laporan', desc: 'Arsip dokumen', admin: true },
+    ].filter(item => !item.admin || (state.user && state.user.role === 'admin')).map(item => `
+            <button onclick="navigate('${item.id}')" class="group bg-[var(--color-bg-elevated)] p-6 rounded-2xl border border-[var(--color-border-subtle)] text-left hover:border-primary-400 transition-all duration-300 hover:shadow-lg card-hover">
+              <div class="w-12 h-12 ${item.bg} ${item.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                <i class="fas ${item.icon} text-xl"></i>
               </div>
-              <div class="text-sm font-semibold text-gray-700 text-center">${item.label}</div>
+              <h3 class="font-bold text-[var(--color-text-primary)] mb-1 group-hover:text-primary-600 transition-colors">${item.label}</h3>
+              <p class="text-sm text-[var(--color-text-tertiary)] group-hover:text-[var(--color-text-secondary)] transition-colors">${item.desc}</p>
             </button>
           `).join('')}
         </div>
       </div>
     </section>
 
-    <!-- Pengumuman Terbaru -->
-    <section class="py-12 bg-white">
+    <!-- Latest Announcements -->
+    <section class="py-16 bg-[var(--color-bg-tertiary)]/50">
       <div class="max-w-7xl mx-auto px-4">
-        <div class="flex justify-between items-center mb-8">
-          <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-bullhorn text-yellow-500 mr-2"></i>Pengumuman Terbaru</h2>
-          <button onclick="navigate('pengumuman')" class="text-blue-600 hover:text-blue-800 font-medium text-sm">Lihat Semua <i class="fas fa-arrow-right ml-1"></i></button>
+        <div class="flex justify-between items-end mb-8">
+          <div>
+            <h2 class="text-3xl font-display font-bold text-[var(--color-text-primary)] mb-2">Papan Pengumuman</h2>
+            <p class="text-[var(--color-text-secondary)]">Informasi terbaru seputar kegiatan KKG</p>
+          </div>
+          <button onclick="navigate('pengumuman')" class="text-primary-600 hover:text-primary-700 font-medium text-sm flex items-center gap-2 group">
+            Lihat Semua <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+          </button>
         </div>
-        <div class="space-y-4">
+        
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           ${pengumuman.length > 0 ? pengumuman.map(p => `
-            <div class="bg-gray-50 rounded-xl p-6 border border-gray-100 hover:border-blue-200 transition cursor-pointer" onclick="navigate('pengumuman')">
-              <div class="flex items-start justify-between">
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 mb-2">
-                    ${p.is_pinned ? '<span class="px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded-full font-medium"><i class="fas fa-thumbtack mr-1"></i>Disematkan</span>' : ''}
-                    <span class="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs rounded-full font-medium">${escapeHtml(p.kategori || 'umum')}</span>
-                  </div>
-                  <h3 class="font-bold text-gray-800 text-lg mb-2">${escapeHtml(p.judul)}</h3>
-                  <p class="text-gray-500 text-sm line-clamp-2">${escapeHtml((p.isi || '').substring(0, 200))}...</p>
-                </div>
-                <div class="text-xs text-gray-400 ml-4 whitespace-nowrap">${formatDateTime(p.created_at)}</div>
+            <div class="bg-[var(--color-bg-elevated)] rounded-2xl p-6 border border-[var(--color-border-subtle)] hover:border-primary-300 transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md group flex flex-col h-full" onclick="navigate('pengumuman')">
+              <div class="flex items-center gap-2 mb-4">
+                 ${p.is_pinned ? '<span class="px-2.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-full font-bold uppercase tracking-wider"><i class="fas fa-thumbtack mr-1"></i>Penting</span>' : ''}
+                 <span class="px-2.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full font-bold uppercase tracking-wider">${escapeHtml(p.kategori || 'umum')}</span>
+              </div>
+              
+              <h3 class="font-bold text-lg text-[var(--color-text-primary)] mb-3 group-hover:text-primary-600 transition-colors line-clamp-2">${escapeHtml(p.judul)}</h3>
+              <p class="text-[var(--color-text-secondary)] text-sm line-clamp-3 mb-4 flex-1">${escapeHtml((p.isi || '').substring(0, 150))}</p>
+              
+              <div class="flex items-center text-xs text-[var(--color-text-tertiary)] pt-4 border-t border-[var(--color-border-subtle)] mt-auto">
+                <i class="far fa-clock mr-2"></i>
+                ${formatDateTime(p.created_at)}
               </div>
             </div>
-          `).join('') : '<p class="text-gray-400 text-center py-8">Belum ada pengumuman. <a href="javascript:void(0)" onclick="initDb()" class="text-blue-500 underline">Inisialisasi Database</a></p>'}
+          `).join('') : `
+            <div class="col-span-full py-12 text-center rounded-3xl border-2 border-dashed border-[var(--color-border-default)]">
+               <div class="w-16 h-16 bg-[var(--color-bg-tertiary)] rounded-full flex items-center justify-center mx-auto mb-4 text-[var(--color-text-tertiary)]">
+                 <i class="far fa-newspaper text-2xl"></i>
+               </div>
+               <p class="text-[var(--color-text-secondary)] font-medium">Belum ada pengumuman terbaru</p>
+               <button onclick="initDb()" class="text-primary-600 hover:text-primary-700 text-sm mt-2 font-medium">Refresh Database</button>
+            </div>
+          `}
         </div>
       </div>
     </section>

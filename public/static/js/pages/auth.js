@@ -9,67 +9,75 @@ import { navigate } from '../router.js';
  */
 export function renderLogin() {
   return `
-    <div class="min-h-screen bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center py-12 px-4">
-      <div class="max-w-md w-full">
+    <div class="min-h-screen relative flex items-center justify-center py-12 px-4 overflow-hidden bg-gray-900">
+      <!-- Animated Background -->
+      <div class="absolute inset-0 z-0">
+        <div class="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-900"></div>
+        <div class="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+        <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary-500/20 rounded-full blur-3xl animate-pulse" style="animation-delay: 2s"></div>
+      </div>
+
+      <div class="max-w-md w-full relative z-10 animate-fade-in">
         <!-- Logo -->
         <div class="text-center mb-8">
-          <div class="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-sm rounded-2xl mb-4">
-            <i class="fas fa-graduation-cap text-4xl text-yellow-400"></i>
+          <div class="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-md rounded-2xl mb-6 shadow-xl border border-white/10 ring-1 ring-white/20">
+            <i class="fas fa-shapes text-4xl text-white drop-shadow-md"></i>
           </div>
-          <h1 id="kkg-name" class="text-2xl font-bold text-white">Portal Digital KKG</h1>
-          <p id="kkg-address-subtitle" class="text-blue-200">Gugus 3 Kecamatan Wanayasa</p>
+          <h1 id="kkg-name" class="text-3xl font-display font-bold text-white mb-2 drop-shadow-sm">Portal Digital KKG</h1>
+          <p id="kkg-address-subtitle" class="text-indigo-200 font-medium tracking-wide">Gugus 3 Kecamatan Wanayasa</p>
         </div>
 
         <!-- Card -->
-        <div class="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20">
+        <div class="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/20 ring-1 ring-black/5">
           <!-- Tabs -->
-          <div class="flex space-x-1 mb-6 bg-white/10 rounded-xl p-1">
+          <div class="flex p-1 mb-8 bg-black/20 rounded-xl backdrop-blur-sm">
             <button 
               id="tab-login" 
               onclick="switchAuthTab('login')"
-              class="auth-tab flex-1 py-2.5 rounded-lg font-medium transition-all text-white bg-white/20"
+              class="auth-tab flex-1 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 text-white shadow-sm bg-white/20"
             >
               <i class="fas fa-sign-in-alt mr-2"></i>Masuk
             </button>
             <button 
               id="tab-register" 
               onclick="switchAuthTab('register')"
-              class="auth-tab flex-1 py-2.5 rounded-lg font-medium transition-all text-white/70 hover:text-white"
+              class="auth-tab flex-1 py-2.5 rounded-lg font-medium text-sm transition-all duration-300 text-white/60 hover:text-white hover:bg-white/5"
             >
               <i class="fas fa-user-plus mr-2"></i>Daftar
             </button>
           </div>
 
           <!-- Login Form -->
-          <form id="login-form" onsubmit="handleLogin(event)">
-            <div class="space-y-4">
+          <form id="login-form" onsubmit="handleLogin(event)" class="animate-slide-up">
+            <div class="space-y-5">
               <div>
-                <label class="block text-white/80 text-sm font-medium mb-2">Email</label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-white/50">
+                <label class="block text-white/90 text-sm font-semibold mb-2 ml-1">Email</label>
+                <div class="relative group">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-indigo-300 group-focus-within:text-white transition-colors">
                     <i class="fas fa-envelope"></i>
                   </span>
                   <input 
                     type="email" 
                     name="email" 
                     placeholder="nama@email.com"
-                    class="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 transition-all"
+                    class="w-full pl-11 pr-4 py-3.5 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:bg-black/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all font-medium"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label class="block text-white/80 text-sm font-medium mb-2">Password</label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-white/50">
+                <label class="block text-white/90 text-sm font-semibold mb-2 ml-1">Password</label>
+                <div class="relative group">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-indigo-300 group-focus-within:text-white transition-colors">
                     <i class="fas fa-lock"></i>
                   </span>
                   <input 
                     type="password" 
                     name="password" 
                     placeholder="Masukkan password"
-                    class="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 transition-all"
+                    class="w-full pl-11 pr-4 py-3.5 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:bg-black/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all font-medium"
                     required
                   />
                 </div>
@@ -78,116 +86,115 @@ export function renderLogin() {
               <button 
                 type="submit" 
                 id="login-btn"
-                class="w-full py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 font-bold rounded-xl hover:from-yellow-300 hover:to-orange-400 transform hover:scale-[1.02] transition-all shadow-lg"
+                class="w-full py-3.5 mt-2 bg-gradient-to-r from-primary-500 to-secondary-600 text-white font-bold rounded-xl hover:from-primary-400 hover:to-secondary-500 transform hover:scale-[1.02] transition-all duration-300 shadow-lg shadow-indigo-500/30 flex items-center justify-center group"
               >
-                <span class="btn-text">Masuk</span>
+                <span class="btn-text group-hover:tracking-wider transition-all">Masuk Aplikasi</span>
                 <span class="btn-loading hidden">
-                  <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
+                  <i class="fas fa-circle-notch fa-spin mr-2"></i>Memproses...
                 </span>
               </button>
               
-              <div class="text-center">
-                <a href="javascript:void(0)" onclick="navigate('reset-password')" class="text-sm text-white/70 hover:text-white transition">
-                  <i class="fas fa-key mr-1"></i>Lupa Password?
+              <div class="text-center pt-2">
+                <a href="javascript:void(0)" onclick="navigate('reset-password')" class="text-sm text-indigo-200 hover:text-white transition-colors">
+                  Lupa Password?
                 </a>
               </div>
             </div>
           </form>
 
           <!-- Register Form -->
-          <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
+          <form id="register-form" class="hidden animate-slide-up" onsubmit="handleRegister(event)">
             <div class="space-y-4">
               <div>
-                <label class="block text-white/80 text-sm font-medium mb-2">Nama Lengkap <span class="text-red-400">*</span></label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-white/50">
+                <label class="block text-white/90 text-sm font-semibold mb-1.5 ml-1">Nama Lengkap <span class="text-red-400">*</span></label>
+                <div class="relative group">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-indigo-300 group-focus-within:text-white transition-colors">
                     <i class="fas fa-user"></i>
                   </span>
                   <input 
                     type="text" 
                     name="nama" 
                     placeholder="Nama lengkap Anda"
-                    class="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 transition-all"
+                    class="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:bg-black/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all font-medium"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label class="block text-white/80 text-sm font-medium mb-2">Email <span class="text-red-400">*</span></label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-white/50">
+                <label class="block text-white/90 text-sm font-semibold mb-1.5 ml-1">Email <span class="text-red-400">*</span></label>
+                <div class="relative group">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-indigo-300 group-focus-within:text-white transition-colors">
                     <i class="fas fa-envelope"></i>
                   </span>
                   <input 
                     type="email" 
                     name="email" 
                     placeholder="nama@email.com"
-                    class="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 focus:ring-2 focus:ring-yellow-400/20 transition-all"
+                    class="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:bg-black/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all font-medium"
                     required
                   />
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-white/80 text-sm font-medium mb-2">Password <span class="text-red-400">*</span></label>
+                  <label class="block text-white/90 text-sm font-semibold mb-1.5 ml-1">Password <span class="text-red-400">*</span></label>
                   <input 
                     type="password" 
                     name="password" 
                     placeholder="Min. 8 karakter"
-                    class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 transition-all"
+                    class="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:bg-black/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all font-medium"
                     required
                   />
                 </div>
                 <div>
-                  <label class="block text-white/80 text-sm font-medium mb-2">Konfirmasi <span class="text-red-400">*</span></label>
+                  <label class="block text-white/90 text-sm font-semibold mb-1.5 ml-1">Konfirmasi <span class="text-red-400">*</span></label>
                   <input 
                     type="password" 
                     name="confirm_password" 
                     placeholder="Ulangi password"
-                    class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 transition-all"
+                    class="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:bg-black/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all font-medium"
                     required
                   />
                 </div>
               </div>
-              <p class="text-xs text-white/50 -mt-2">Password minimal 8 karakter, mengandung huruf dan angka</p>
 
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-white/80 text-sm font-medium mb-2">NIP</label>
+                  <label class="block text-white/90 text-sm font-semibold mb-1.5 ml-1">NIP</label>
                   <input 
                     type="text" 
                     name="nip" 
                     placeholder="NIP (opsional)"
-                    class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 transition-all"
+                    class="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:bg-black/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all font-medium"
                   />
                 </div>
                 <div>
-                  <label class="block text-white/80 text-sm font-medium mb-2">No. HP</label>
+                  <label class="block text-white/90 text-sm font-semibold mb-1.5 ml-1">No. HP</label>
                   <input 
                     type="tel" 
                     name="no_hp" 
                     placeholder="08xxx (opsional)"
-                    class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 transition-all"
+                    class="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:bg-black/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label class="block text-white/80 text-sm font-medium mb-2">Asal Sekolah</label>
-                <div class="relative">
-                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-white/50">
+                <label class="block text-white/90 text-sm font-semibold mb-1.5 ml-1">Asal Sekolah</label>
+                <div class="relative group">
+                  <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-indigo-300 group-focus-within:text-white transition-colors">
                     <i class="fas fa-school"></i>
                   </span>
                   <select 
                     name="sekolah" 
                     id="register-sekolah-select"
-                    class="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-yellow-400/50 transition-all appearance-none"
+                    class="w-full pl-11 pr-4 py-3 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:bg-black/30 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/50 transition-all font-medium appearance-none"
                   >
-                    <option value="" class="text-gray-800">-- Pilih Sekolah --</option>
+                    <option value="" class="text-gray-800 bg-white">-- Pilih Sekolah --</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-white/70">
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-white/60">
                     <i class="fas fa-chevron-down text-xs"></i>
                   </div>
                 </div>
@@ -196,29 +203,29 @@ export function renderLogin() {
               <button 
                 type="submit" 
                 id="register-btn"
-                class="w-full py-3 bg-gradient-to-r from-green-400 to-emerald-500 text-gray-900 font-bold rounded-xl hover:from-green-300 hover:to-emerald-400 transform hover:scale-[1.02] transition-all shadow-lg"
+                class="w-full py-3.5 mt-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold rounded-xl hover:from-emerald-400 hover:to-teal-400 transform hover:scale-[1.02] transition-all duration-300 shadow-lg shadow-emerald-500/30 flex items-center justify-center group"
               >
-                <span class="btn-text">Daftar Sekarang</span>
+                <span class="btn-text group-hover:tracking-wider transition-all">Daftar Sekarang</span>
                 <span class="btn-loading hidden">
-                  <i class="fas fa-spinner fa-spin mr-2"></i>Memproses...
+                  <i class="fas fa-circle-notch fa-spin mr-2"></i>Memproses...
                 </span>
               </button>
             </div>
           </form>
 
           <!-- Demo Credentials -->
-          <div class="mt-6 p-4 bg-blue-500/20 rounded-xl border border-blue-400/30">
-            <p class="text-sm text-blue-200">
-              <i class="fas fa-info-circle mr-2"></i>
-              <strong>Demo:</strong> admin@kkg-wanayasa.id / admin123
+          <div class="mt-8 p-4 bg-indigo-500/10 rounded-xl border border-indigo-500/20 backdrop-blur-sm">
+            <p class="text-xs text-indigo-200 text-center">
+              <i class="fas fa-info-circle mr-1"></i>
+              <strong>Demo Account:</strong> admin@kkg-wanayasa.id / admin123
             </p>
           </div>
         </div>
 
         <!-- Back to Home -->
-        <div class="text-center mt-6">
-          <button onclick="navigate('home')" class="text-white/70 hover:text-white transition-colors">
-            <i class="fas fa-arrow-left mr-2"></i>Kembali ke Beranda
+        <div class="text-center mt-8">
+          <button onclick="navigate('home')" class="text-white/60 hover:text-white transition-colors text-sm flex items-center justify-center mx-auto gap-2 group">
+            <i class="fas fa-arrow-left group-hover:-translate-x-1 transition-transform"></i> Kembali ke Beranda
           </button>
         </div>
       </div>
@@ -275,21 +282,27 @@ window.switchAuthTab = function (tab) {
   if (tab === 'login') {
     loginForm.classList.remove('hidden');
     registerForm.classList.add('hidden');
-    tabLogin.classList.add('bg-white/20');
-    tabLogin.classList.remove('text-white/70');
-    tabLogin.classList.add('text-white');
-    tabRegister.classList.remove('bg-white/20');
-    tabRegister.classList.add('text-white/70');
-    tabRegister.classList.remove('text-white');
+
+    // Animate transition
+    loginForm.classList.add('animate-slide-up');
+
+    tabLogin.classList.remove('text-white/60', 'hover:text-white', 'hover:bg-white/5');
+    tabLogin.classList.add('text-white', 'shadow-sm', 'bg-white/20');
+
+    tabRegister.classList.add('text-white/60', 'hover:text-white', 'hover:bg-white/5');
+    tabRegister.classList.remove('text-white', 'shadow-sm', 'bg-white/20');
   } else {
     loginForm.classList.add('hidden');
     registerForm.classList.remove('hidden');
-    tabLogin.classList.remove('bg-white/20');
-    tabLogin.classList.add('text-white/70');
-    tabLogin.classList.remove('text-white');
-    tabRegister.classList.add('bg-white/20');
-    tabRegister.classList.remove('text-white/70');
-    tabRegister.classList.add('text-white');
+
+    // Animate transition
+    registerForm.classList.add('animate-slide-up');
+
+    tabLogin.classList.add('text-white/60', 'hover:text-white', 'hover:bg-white/5');
+    tabLogin.classList.remove('text-white', 'shadow-sm', 'bg-white/20');
+
+    tabRegister.classList.remove('text-white/60', 'hover:text-white', 'hover:bg-white/5');
+    tabRegister.classList.add('text-white', 'shadow-sm', 'bg-white/20');
 
     // Load sekolah list if empty
     const sekolahSelect = document.getElementById('register-sekolah-select');
@@ -309,7 +322,7 @@ async function loadSekolahForRegister(select) {
       const option = document.createElement('option');
       option.value = s.nama;
       option.textContent = s.nama;
-      option.className = "text-gray-800"; // Ensure text is visible on white background
+      option.className = "text-gray-800 bg-white"; // Ensure text is visible on white background options
       select.appendChild(option);
     });
   } catch (e) {
@@ -432,10 +445,12 @@ function setButtonLoading(btn, loading) {
 
   if (loading) {
     btn.disabled = true;
+    btn.classList.add('opacity-80', 'cursor-not-allowed');
     if (textEl) textEl.classList.add('hidden');
     if (loadingEl) loadingEl.classList.remove('hidden');
   } else {
     btn.disabled = false;
+    btn.classList.remove('opacity-80', 'cursor-not-allowed');
     if (textEl) textEl.classList.remove('hidden');
     if (loadingEl) loadingEl.classList.add('hidden');
   }

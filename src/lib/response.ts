@@ -137,6 +137,9 @@ export const Errors = {
     notFound: (c: any, resource = 'Data') =>
         errorResponse(c, ErrorCodes.NOT_FOUND, `${resource} tidak ditemukan`, 404),
 
+    conflict: (c: any, message = 'Data sudah ada') =>
+        errorResponse(c, ErrorCodes.DUPLICATE, message, 409),
+
     validation: (c: any, message: string, details?: any) =>
         errorResponse(c, ErrorCodes.VALIDATION_ERROR, message, 400, details),
 
