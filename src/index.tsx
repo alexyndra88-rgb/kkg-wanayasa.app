@@ -111,6 +111,20 @@ app.get('/api/health', (c) => {
   });
 });
 
+// DB Patch Endpoint (Temporary Fix)
+app.get('/api/db-patch/add-file-key', async (c) => {
+  try {
+    try {
+      await c.env.DB.prepare("ALTER TABLE materi ADD COLUMN file_key TEXT").run();
+      return c.text("Patch Applied: Added file_key column.");
+    } catch (e: any) {
+      return c.text("Patch Info: " + e.message); // Likely duplicate column
+    }
+  } catch (err: any) {
+    return c.text("Error: " + err.message);
+  }
+});
+
 // DB init endpoint (for first setup)
 app.get('/api/init-db', async (c) => {
   try {

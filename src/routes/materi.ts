@@ -68,24 +68,15 @@ materi.post('/', async (c) => {
   }
 
   try {
-    const contentType = c.req.header('Content-Type') || '';
-    let body: any = {};
-    try {
-      if (contentType.includes('application/json')) {
-        body = await c.req.json();
-      } else {
-        body = await c.req.parseBody();
-      }
-    } catch (e) {
-      return Errors.validation(c, 'Invalid request body');
-    }
+    const body = await c.req.parseBody();
 
     const judul = body.judul as string;
     const deskripsi = body.deskripsi as string;
     const kategori = body.kategori as string;
     const jenjang = body.jenjang as string;
     const jenis = body.jenis as string;
-    const file = body.file as File;
+    const fileUrlInput = body.file_url as string;
+    const file = body.file instanceof File ? body.file : null;
 
     if (!judul) {
       return Errors.validation(c, 'Judul materi harus diisi');
@@ -106,14 +97,19 @@ materi.post('/', async (c) => {
     let finalFileUrl: string | null = null;
     let finalFileKey: string | null = null;
     let finalFileName: string | null = null;
-    let fileSize: number | null = null;
+    let fileSize: number = 0;
 
-    // 1. Direct File Upload (Multipart)
-    if (file && typeof file === 'object' && file.name) {
-      const uploadResult = await uploadFile(c.env, file as any, 'materi');
+    // 1. Prioritas 1: Upload File Fisik (via Supabase)
+    if (file) {
+      // Limit size 10MB
+      if (file.size > 10 * 1024 * 1024) {
+        return Errors.validation(c, 'Ukuran file maksimal 10MB');
+      }
 
+      const uploadResult = await uploadFile(c.env, file, 'materi');
       if (uploadResult.error) {
-        return Errors.internal(c, `Upload gagal: ${uploadResult.error}`);
+        console.error('Supabase upload failed:', uploadResult.error);
+        return Errors.internal(c, `Gagal upload file: ${uploadResult.error}`);
       }
 
       finalFileUrl = uploadResult.url;
@@ -121,56 +117,40 @@ materi.post('/', async (c) => {
       finalFileName = file.name;
       fileSize = file.size;
     }
-    // 2. Pre-uploaded File (JSON with file_key)
-    else if (body.file_key) {
-      finalFileKey = body.file_key;
-      finalFileName = body.file_name || 'file';
-      fileSize = body.file_size ? Number(body.file_size) : 0;
-      finalFileUrl = body.file_url || null; // Optional, might be generated on fly
-    }
-    // 3. External URL
-    else {
-      // Allow URL input if no file uploaded
-      const file_url = body.file_url as string;
-      if (file_url) {
-        if (!file_url.match(/^https?:\/\//)) {
-          return Errors.validation(c, 'URL file harus dimulai dengan http:// atau https://');
-        }
-        finalFileUrl = file_url;
+    // 2. Prioritas 2: External URL (jika tidak ada file fisik)
+    else if (fileUrlInput) {
+      if (!fileUrlInput.match(/^https?:\/\//)) {
+        return Errors.validation(c, 'URL file harus dimulai dengan http:// atau https://');
       }
+      finalFileUrl = fileUrlInput;
     }
 
-    try {
-      const result = await c.env.DB.prepare(`
+    // Insert to DB
+    const result = await c.env.DB.prepare(`
         INSERT INTO materi (judul, deskripsi, kategori, jenjang, jenis, file_url, file_key, file_name, file_size, uploaded_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        judul.trim(),
-        deskripsi ? deskripsi.trim() : null,
-        kategori ? kategori.trim() : null,
-        jenjang || null,
-        jenis || null,
-        finalFileUrl,
-        finalFileKey,
-        finalFileName,
-        fileSize,
-        user.id
-      ).run();
+    `).bind(
+      judul.trim(),
+      deskripsi ? deskripsi.trim() : null,
+      kategori ? kategori.trim() : null,
+      jenjang || null,
+      jenis || null,
+      finalFileUrl,
+      finalFileKey,
+      finalFileName,
+      fileSize,
+      user.id
+    ).run();
 
-      return successResponse(c, {
-        id: result.meta.last_row_id,
-        judul,
-        jenis,
-        jenjang,
-        file_url: finalFileUrl
-      }, 'Materi berhasil diupload', 201);
-    } catch (dbError: any) {
-      console.error('Database insert error:', dbError);
-      throw new Error(`Database error: ${dbError.message}`);
-    }
+    return successResponse(c, {
+      id: result.meta.last_row_id,
+      judul,
+      file_url: finalFileUrl
+    }, 'Materi berhasil diupload', 201);
+
   } catch (e: any) {
     console.error('Upload materi error:', e);
-    return Errors.internal(c);
+    return Errors.internal(c, e.message);
   }
 });
 

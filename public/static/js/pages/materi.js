@@ -302,12 +302,14 @@ window.showUploadMateri = function () {
     </div>`;
 }
 
+// Store selected file
+let selectedFile = null;
+
 window.handleDragOver = function (e) {
   e.preventDefault();
   e.stopPropagation();
   const dz = document.getElementById('file-drop-zone');
   dz.classList.add('border-orange-400', 'bg-orange-50', 'dark:bg-orange-900/20');
-  dz.classList.remove('border-[var(--color-border-default)]');
 }
 
 window.handleDragLeave = function (e) {
@@ -315,138 +317,55 @@ window.handleDragLeave = function (e) {
   e.stopPropagation();
   const dz = document.getElementById('file-drop-zone');
   dz.classList.remove('border-orange-400', 'bg-orange-50', 'dark:bg-orange-900/20');
-  dz.classList.add('border-[var(--color-border-default)]');
 }
 
-window.handleFileDrop = async function (e) {
+window.handleFileDrop = function (e) {
   e.preventDefault();
   e.stopPropagation();
   window.handleDragLeave(e);
-
   const files = e.dataTransfer.files;
-  if (files.length > 0) {
-    await uploadFile(files[0]);
-  }
+  if (files.length > 0) processSelectedFile(files[0]);
 }
 
-window.handleFileSelect = async function (e) {
+window.handleFileSelect = function (e) {
   const files = e.target.files;
-  if (files.length > 0) {
-    await uploadFile(files[0]);
-  }
+  if (files.length > 0) processSelectedFile(files[0]);
 }
 
-async function uploadFile(file) {
-  const maxSize = 10 * 1024 * 1024; // 10MB
-  if (file.size > maxSize) {
+function processSelectedFile(file) {
+  if (file.size > 10 * 1024 * 1024) {
     showToast('Ukuran file maksimal 10MB', 'error');
     return;
   }
+  selectedFile = file;
 
+  // Update UI
   const content = document.getElementById('file-upload-content');
-  const progress = document.getElementById('upload-progress');
-  const progressBar = document.getElementById('progress-bar');
-  const progressText = document.getElementById('progress-text');
-
-  // Show progress
-  progress.classList.remove('hidden');
   content.innerHTML = `
-        <i class="fas fa-file-alt text-4xl text-orange-500 mb-3 animate-pulse"></i>
-        <p class="text-[var(--color-text-primary)] font-medium">${escapeHtml(file.name)}</p>
-        <p class="text-xs text-[var(--color-text-tertiary)] mt-1">${formatFileSize(file.size)}</p>
-    `;
-
-  try {
-    // Create FormData
-    const formData = new FormData();
-    formData.append('file', file);
-
-    // Get CSRF token
-    let csrfToken = getCsrfToken();
-    if (!csrfToken) {
-      csrfToken = await refreshCsrfToken();
-    }
-
-    // Indicate upload starting
-    let prog = 0;
-    const progressInterval = setInterval(() => {
-      prog = Math.min(prog + Math.random() * 20, 95);
-      if (progressBar) progressBar.style.width = prog + '%';
-      if (progressText) progressText.textContent = Math.round(prog) + '%';
-    }, 400);
-
-    // Perform Upload
-    // Note: We use raw fetch because the api() wrapper sets validation headers that interfere with FormData boundary
-    const response = await fetch('/api/files/upload', {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'X-CSRF-Token': csrfToken || ''
-      }
-    });
-
-    clearInterval(progressInterval);
-
-    let result;
-    try {
-      result = await response.json();
-    } catch (e) {
-      throw new Error('Gagal memproses respon server');
-    }
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.error?.message || result.message || 'Gagal mengupload file');
-    }
-
-    // Success Handling
-    if (progressBar) progressBar.style.width = '100%';
-    if (progressText) progressText.textContent = '100%';
-
-    currentUploadedFile = result.data;
-    const keyInput = document.getElementById('file-key-input');
-    if (keyInput) keyInput.value = result.data.key;
-
-    content.innerHTML = `
-            <div class="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-3">
-                <i class="fas fa-check text-2xl text-green-500"></i>
-            </div>
-            <p class="text-[var(--color-text-primary)] font-medium truncate max-w-[200px] mx-auto">${escapeHtml(file.name)}</p>
-            <div class="flex gap-2 justify-center mt-3">
-                <button type="button" onclick="removeUploadedFile()" class="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1 bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors">
-                    Hapus
-                </button>
-                <span class="text-xs text-green-600 dark:text-green-400 font-medium px-3 py-1 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    Sukses
-                </span>
-            </div>
-        `;
-
-    showToast('File berhasil diupload', 'success');
-
-  } catch (e) {
-    if (content) {
-      content.innerHTML = `
-            <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-3"></i>
-            <p class="text-[var(--color-text-primary)]">${escapeHtml(e.message || 'Gagal mengupload file')}</p>
-            <button type="button" onclick="document.getElementById('file-input').click()" class="text-xs text-orange-500 hover:text-orange-600 mt-2 font-medium">Coba lagi</button>
-        `;
-    }
-    if (progress) progress.classList.add('hidden');
-    showToast(e.message || 'Gagal mengupload file', 'error');
-  }
+    <div class="w-16 h-16 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mx-auto mb-3">
+        <i class="fas fa-file-alt text-2xl text-orange-500"></i>
+    </div>
+    <p class="text-[var(--color-text-primary)] font-medium truncate max-w-[200px] mx-auto">${escapeHtml(file.name)}</p>
+    <p class="text-xs text-[var(--color-text-tertiary)] mt-1">${formatFileSize(file.size)}</p>
+    <div class="flex gap-2 justify-center mt-3">
+        <button type="button" onclick="removeSelectedFile()" class="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1 bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors">
+            Batal
+        </button>
+        <span class="text-xs text-orange-600 font-medium px-3 py-1 bg-orange-50 rounded-lg">Siap Upload</span>
+    </div>
+  `;
 }
 
-window.removeUploadedFile = function () {
-  currentUploadedFile = null;
-  document.getElementById('file-key-input').value = '';
-  document.getElementById('upload-progress').classList.add('hidden');
+window.removeSelectedFile = function () {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
   document.getElementById('file-upload-content').innerHTML = `
-        <div class="w-16 h-16 rounded-full bg-[var(--color-bg-tertiary)] flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-          <i class="fas fa-cloud-upload-alt text-3xl text-[var(--color-text-tertiary)] group-hover:text-orange-500 transition-colors"></i>
-        </div>
-        <p class="text-[var(--color-text-primary)] font-medium">Drag & drop file di sini atau <span class="text-orange-500">klik untuk pilih file</span></p>
-        <p class="text-xs text-[var(--color-text-tertiary)] mt-2">PDF, DOC, XLS, PPT, Gambar, ZIP (max 10MB)</p>
-    `;
+    <div class="w-16 h-16 rounded-full bg-[var(--color-bg-tertiary)] flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+      <i class="fas fa-cloud-upload-alt text-3xl text-[var(--color-text-tertiary)] group-hover:text-orange-500 transition-colors"></i>
+    </div>
+    <p class="text-[var(--color-text-primary)] font-medium">Drag & drop file di sini atau <span class="text-orange-500">klik untuk pilih file</span></p>
+    <p class="text-xs text-[var(--color-text-tertiary)] mt-2">PDF, DOC, XLS, PPT, Gambar, ZIP (max 10MB)</p>
+  `;
 }
 
 window.uploadMateri = async function (e) {
@@ -455,29 +374,39 @@ window.uploadMateri = async function (e) {
   const btn = document.getElementById('submit-materi-btn');
 
   btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Mengupload...';
 
   try {
-    const payload = {
-      judul: form.judul.value,
-      deskripsi: form.deskripsi.value,
-      jenis: form.jenis.value,
-      jenjang: form.jenjang.value,
-      kategori: form.kategori.value,
-      file_url: form.file_url.value
-    };
+    const formData = new FormData();
+    formData.append('judul', form.judul.value);
+    formData.append('deskripsi', form.deskripsi.value);
+    formData.append('jenis', form.jenis.value);
+    formData.append('jenjang', form.jenjang.value);
+    formData.append('kategori', form.kategori.value);
+    formData.append('file_url', form.file_url.value);
 
-    if (currentUploadedFile) {
-      payload.file_key = currentUploadedFile.key;
-      payload.file_name = currentUploadedFile.filename;
-      payload.file_size = currentUploadedFile.size;
-      payload.content_type = currentUploadedFile.contentType;
+    if (selectedFile) {
+      formData.append('file', selectedFile);
     }
 
-    await api('/materi', {
+    // Use fetch directly for FormData to avoid Content-Type header issues
+    let csrfToken = getCsrfToken();
+    if (!csrfToken) csrfToken = await refreshCsrfToken();
+
+    const res = await fetch('/api/materi', {
       method: 'POST',
-      body: payload
+      headers: {
+        'X-CSRF-Token': csrfToken || ''
+      },
+      body: formData
     });
+
+    const result = await res.json();
+
+    if (!result.success) {
+      throw new Error(result.error?.message || result.message || 'Gagal upload materi');
+    }
+
     showToast('Materi berhasil disimpan!', 'success');
     window.location.reload();
   } catch (e) {
