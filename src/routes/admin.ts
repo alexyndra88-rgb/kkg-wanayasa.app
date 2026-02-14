@@ -10,7 +10,7 @@ import {
   cleanOldAuditLogs,
   formatAuditAction
 } from '../lib/audit';
-import { createNotification, createBulkNotifications } from '../lib/notification';
+
 import type { DashboardStats, Settings } from '../types';
 
 
@@ -38,28 +38,7 @@ const requireAdmin = async (c: any, next: () => Promise<void>) => {
 
 admin.use('/*', requireAdmin);
 
-// Test Notification Endpoint (Broadcast)
-admin.post('/test-notification', async (c) => {
-  try {
-    const { results } = await c.env.DB.prepare('SELECT id FROM users').all();
-    const ids = results.map((u: any) => u.id as number);
 
-    if (ids.length > 0) {
-      await createBulkNotifications(
-        c.env.DB,
-        ids,
-        'Info Sistem 📢',
-        `Ini adalah uji coba notifikasi broadcast.\nDikirim pada: ${new Date().toLocaleString('id-ID')}`,
-        'info',
-        '/pengumuman'
-      );
-    }
-
-    return successResponse(c, { count: ids.length }, `Sukses kirim ke ${ids.length} user.`);
-  } catch (e: any) {
-    return Errors.internal(c, e.message);
-  }
-});
 
 
 // Dashboard stats
