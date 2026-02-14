@@ -111,6 +111,32 @@ app.get('/api/health', (c) => {
   });
 });
 
+// Fix Notifications Table (Temporary)
+app.get('/api/db-patch/fix-notifications', async (c) => {
+  try {
+    await c.env.DB.prepare(`
+            CREATE TABLE IF NOT EXISTS notifications (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER NOT NULL,
+              type TEXT NOT NULL DEFAULT 'info',
+              title TEXT NOT NULL,
+              message TEXT NOT NULL,
+              link TEXT,
+              is_read INTEGER DEFAULT 0,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+        `).run();
+
+    // Add indexes separately
+    await c.env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);').run();
+    await c.env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);').run();
+
+    return c.text("Notifications table created successfully!");
+  } catch (e: any) {
+    return c.text("Error fixing notifications: " + e.message);
+  }
+});
+
 
 
 // DB init endpoint (for first setup)
