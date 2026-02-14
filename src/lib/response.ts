@@ -143,6 +143,9 @@ export const Errors = {
     validation: (c: any, message: string, details?: any) =>
         errorResponse(c, ErrorCodes.VALIDATION_ERROR, message, 400, details),
 
+    badRequest: (c: any, message = 'Permintaan tidak valid') =>
+        errorResponse(c, ErrorCodes.INVALID_INPUT, message, 400),
+
     rateLimited: (c: any, retryAfter: number) =>
         errorResponse(c, ErrorCodes.RATE_LIMITED, 'Terlalu banyak permintaan', 429, { retryAfter }),
 

@@ -18,6 +18,9 @@ const CSRF_IGNORE_PATHS = [
     '/api/init-db',
     '/api/admin/settings/logo', // File upload uses FormData
     '/api/files/upload', // File upload uses FormData
+    '/api/rpp/generate', // AI generation (session-authenticated)
+    '/api/kisi/generate', // AI generation (session-authenticated)
+    '/api/presentation/generate', // AI generation (session-authenticated)
 ];
 
 /**

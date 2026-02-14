@@ -95,8 +95,11 @@ export async function api(path, options = {}) {
 
     try {
         const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeoutMs = options.timeout || 30000; // Default 30s, overridable
+        const id = setTimeout(() => controller.abort(), timeoutMs);
         mergedOptions.signal = controller.signal;
+        // Remove non-fetch properties
+        delete mergedOptions.timeout;
 
         const response = await fetch(url, mergedOptions);
         clearTimeout(id);
@@ -122,9 +125,10 @@ export async function api(path, options = {}) {
                 csrfRetryCount++;
                 console.log('CSRF token invalid, refreshing...');
                 await refreshCsrfToken();
+                // Retry the request with fresh token (csrfRetryCount stays incremented to prevent infinite loop)
+                const result = await api(path, options);
                 csrfRetryCount = 0;
-                // Retry the request with fresh token
-                return api(path, options);
+                return result;
             }
             csrfRetryCount = 0;
         }
@@ -133,16 +137,6 @@ export async function api(path, options = {}) {
         if (!response.ok || data.success === false) {
             const errorMessage = data.error?.message || data.message || 'Terjadi kesalahan';
             const errorCode = data.error?.code || 'UNKNOWN_ERROR';
-
-            // Handle specific error codes
-            // if (errorCode === 'UNAUTHORIZED' || response.status === 401) {
-            //     // Clear user state and redirect to login
-            //     // DISABLED: Causing redirect loops or unexpected logouts
-            //     if (state.user) {
-            //         state.user = null;
-            //         showToast('Sesi Anda telah berakhir. Silakan login kembali.', 'warning');
-            //     }
-            // }
 
             throw new ApiError(errorMessage, errorCode, response.status);
         }
@@ -153,13 +147,17 @@ export async function api(path, options = {}) {
             throw error;
         }
 
-        // Network or parsing errors
-        console.error('API Error:', error);
-        throw new ApiError(
-            'Gagal menghubungi server. Periksa koneksi internet Anda.',
-            'NETWORK_ERROR',
-            0
-        );
+        // Detailed technical error in console for debugging
+        console.error(`API Error on [${path}]:`, error);
+
+        let msg = 'Gagal menghubungi server. Periksa koneksi internet Anda.';
+        if (error.name === 'AbortError') {
+            msg = 'Request timeout. Server terlalu lama merespons (AI sedang sibuk).';
+        } else if (error.message.includes('Failed to fetch')) {
+            msg = 'Tidak dapat menyambung ke server. Pastikan Anda membuka http://localhost:5175';
+        }
+
+        throw new ApiError(msg, 'NETWORK_ERROR', 0);
     }
 }
 

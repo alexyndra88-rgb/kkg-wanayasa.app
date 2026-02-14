@@ -4,7 +4,7 @@ import adapter from '@hono/vite-dev-server/cloudflare'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  server: { port: 5175 },
+  server: { port: 5173 },
   plugins: [
     devServer({
       adapter, // Enable Cloudflare bindings in Vite

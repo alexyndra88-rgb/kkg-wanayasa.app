@@ -18,11 +18,16 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.986.0",
+    "@google/generative-ai": "^0.24.1",
     "@hono/vite-cloudflare-pages": "^0.4.3",
+    "@mistralai/mistralai": "^1.14.0",
     "@supabase/supabase-js": "^2.95.3",
+    "cheerio": "^1.2.0",
     "docx": "^9.5.1",
     "file-saver": "^2.0.5",
+    "groq-sdk": "^0.37.0",
     "hono": "^4.7.5",
+    "mammoth": "^1.11.0",
     "qrcode": "^1.5.4",
     "zod": "^4.3.6"
   },

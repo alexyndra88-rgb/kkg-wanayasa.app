@@ -374,3 +374,58 @@ export function alert(message, type = 'info', dismissible = false) {
     </div>
   `;
 }
+
+/**
+ * Render locked feature teaser for non-logged in users
+ */
+export function renderLockedFeature(title, description, features = []) {
+  return `
+    <div class="min-h-[80vh] flex flex-col items-center justify-center p-8 text-center animate-fade-in relative overflow-hidden">
+      <!-- Background Decorations -->
+      <div class="absolute top-0 left-1/4 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl animate-pulse"></div>
+      <div class="absolute bottom-0 right-1/4 w-80 h-80 bg-secondary-500/10 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s"></div>
+
+      <div class="relative z-10 max-w-2xl bg-[var(--color-bg-elevated)] border border-[var(--color-border-default)] p-8 md:p-12 rounded-3xl shadow-xl shadow-primary-500/5">
+        
+        <div class="w-20 h-20 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+          <i class="fas fa-lock text-3xl text-primary-600 dark:text-primary-400"></i>
+        </div>
+
+        <h2 class="text-3xl md:text-4xl font-display font-bold text-[var(--color-text-primary)] mb-4">
+          ${escapeHtml(title)}
+        </h2>
+        
+        <p class="text-[var(--color-text-secondary)] text-lg mb-8 leading-relaxed">
+          ${escapeHtml(description)}
+        </p>
+
+        ${features.length > 0 ? `
+          <div class="text-left bg-[var(--color-bg-tertiary)] p-6 rounded-2xl mb-8">
+            <h4 class="font-bold text-[var(--color-text-primary)] mb-4 text-sm uppercase tracking-wider">Fitur Unggulan:</h4>
+            <ul class="space-y-3">
+              ${features.map(f => `
+                <li class="flex items-start gap-3 text-[var(--color-text-secondary)]">
+                  <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                  <span>${escapeHtml(f)}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        ` : ''}
+
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <button onclick="navigate('login')" class="btn btn-primary px-8 py-3 text-lg shadow-lg shadow-primary-500/30 hover:scale-105 active:scale-95 transition-transform">
+            <i class="fas fa-sign-in-alt mr-2"></i> Masuk Sekarang
+          </button>
+          <button onclick="navigate('home')" class="btn btn-secondary px-8 py-3 text-lg">
+            Nanti Saja
+          </button>
+        </div>
+        
+        <p class="mt-6 text-xs text-[var(--color-text-tertiary)]">
+          Sudah punya akun? <a href="#" onclick="navigate('login'); return false;" class="text-primary-600 hover:underline">Login di sini</a>
+        </p>
+      </div>
+    </div>
+  `;
+}

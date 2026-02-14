@@ -58,6 +58,9 @@ const pages = {
   'reset-password': async () => (await import('./pages/reset-password.js')).renderResetPassword(),
   laporan: async () => (await import('./pages/laporan.js')).renderLaporan(),
   notifications: async () => (await import('./pages/notifications.js')).renderNotifications(),
+  rpp: async () => (await import('./pages/rpp.js')).renderRpp(),
+  kisi: async () => (await import('./pages/kisi.js')).renderKisi(),
+  slide: async () => (await import('./pages/slide.js')).renderSlide(),
 };
 
 // Protected pages (require authentication)
@@ -65,25 +68,39 @@ const protectedPages = ['surat', 'proker', 'absensi', 'profile', 'notifications'
 const adminPages = ['admin'];
 
 // Navigation Links Configuration
+// Navigation Links Configuration (Reordered for Professional Layout)
 const navLinks = [
-  { page: 'home', label: 'Beranda', icon: 'fa-home', public: true },
-  { page: 'notifications', label: 'Notifikasi', icon: 'fa-bell', auth: true },
-  { page: 'pengumuman', label: 'Pengumuman', icon: 'fa-bullhorn', public: true },
-  { page: 'surat', label: 'Generator Surat', icon: 'fa-file-alt', admin: true },
-  { page: 'proker', label: 'Program Kerja', icon: 'fa-tasks', admin: true },
-  { page: 'laporan', label: 'Laporan KKG', icon: 'fa-file-contract', admin: true },
-  { page: 'absensi', label: 'Absensi', icon: 'fa-clipboard-check', auth: true },
-  { page: 'kalender', label: 'Kalender', icon: 'fa-calendar-alt', public: true },
-  { page: 'materi', label: 'Materi', icon: 'fa-book-open', public: true },
-  { page: 'guru', label: 'Direktori Guru', icon: 'fa-users', public: true },
-  { page: 'forum', label: 'Forum', icon: 'fa-comments', public: true },
-  { page: 'profile', label: 'Pengaturan Akun', icon: 'fa-user-cog', auth: true },
-  { page: 'admin', label: 'Panel Admin', icon: 'fa-cog', admin: true },
+  // MENU UTAMA
+  { page: 'home', label: 'Beranda', icon: 'fa-home', public: true, section: 'Menu Utama' },
+  { page: 'pengumuman', label: 'Pengumuman', icon: 'fa-bullhorn', public: true, section: 'Menu Utama' },
+  { page: 'kalender', label: 'Kalender', icon: 'fa-calendar-alt', public: true, section: 'Menu Utama' },
+
+  // AKADEMIK & PERANGKAT
+  { page: 'materi', label: 'Materi & Bahan Ajar', icon: 'fa-book-open', public: true, section: 'Akademik' },
+  { page: 'rpp', label: 'Buat RPP', icon: 'fa-magic', public: true, section: 'Akademik' },
+  { page: 'slide', label: 'Buat Slide', icon: 'fa-file-powerpoint', public: true, section: 'Akademik' },
+  { page: 'kisi', label: 'Buat Asesmen', icon: 'fa-list-check', public: true, section: 'Akademik' },
+
+  // INTERAKSI & KEGIATAN
+  { page: 'absensi', label: 'Absensi Kegiatan', icon: 'fa-clipboard-check', auth: true, section: 'Interaksi' },
+  { page: 'forum', label: 'Forum Diskusi', icon: 'fa-comments', public: true, section: 'Interaksi' },
+  { page: 'guru', label: 'Direktori Guru', icon: 'fa-users', public: true, section: 'Interaksi' },
+
+  // ADMINISTRASI (Admin Only)
+  { page: 'admin', label: 'Panel Admin', icon: 'fa-cog', admin: true, section: 'Administrasi' },
+  { page: 'surat', label: 'Generator Surat', icon: 'fa-file-alt', admin: true, section: 'Administrasi' },
+  { page: 'proker', label: 'Program Kerja', icon: 'fa-tasks', admin: true, section: 'Administrasi' },
+  { page: 'laporan', label: 'Laporan KKG', icon: 'fa-file-contract', admin: true, section: 'Administrasi' },
+
+  // AKUN SAYA
+  { page: 'notifications', label: 'Notifikasi', icon: 'fa-bell', auth: true, section: 'Akun Saya' },
+  { page: 'profile', label: 'Pengaturan Akun', icon: 'fa-user-cog', auth: true, section: 'Akun Saya' },
 ];
 
 function renderNavLinks(activePage) {
   const isLoggedIn = !!state.user;
   const isAdmin = state.user?.role === 'admin';
+  let lastSection = null;
 
   return navLinks.filter(link => {
     if (link.public) return true;
@@ -91,11 +108,21 @@ function renderNavLinks(activePage) {
     if (link.admin && isAdmin) return true;
     return false;
   }).map(link => {
+    let sectionHtml = '';
+    // Add section header if it changes and it's not the very first item (optional, but looks better with spacing)
+    // Actually, we want it for the first item too if we want full structure.
+    if (link.section !== lastSection) {
+      lastSection = link.section;
+      // Add top margin if it's not the first section
+      const mt = (link.section === 'Menu Utama') ? 'mb-2' : 'mt-6 mb-2';
+      sectionHtml = `<div class="px-4 ${mt} text-[10px] font-bold text-[var(--color-text-tertiary)] uppercase tracking-widest opacity-80">${link.section}</div>`;
+    }
+
     const isActive = activePage === link.page;
-    return `
+    const buttonHtml = `
       <button 
         onclick="navigate('${link.page}'); if(window.innerWidth < 768) toggleMobileMenu();"
-        class="w-full text-left px-4 py-3 rounded-xl mb-1 flex items-center transition-all duration-300 group relative overflow-hidden ${isActive
+        class="w-full text-left px-4 py-2.5 rounded-xl mb-1 flex items-center transition-all duration-300 group relative overflow-hidden ${isActive
         ? 'bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-lg shadow-primary-500/25 ring-1 ring-white/10'
         : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] hover:text-primary-600 dark:hover:text-primary-400'
       }"
@@ -105,9 +132,9 @@ function renderNavLinks(activePage) {
         ? 'bg-white/20 text-white'
         : 'bg-[var(--color-bg-tertiary)] group-hover:bg-primary-50 dark:group-hover:bg-primary-900/20 text-[var(--color-text-tertiary)] group-hover:text-primary-600 dark:group-hover:text-primary-400'
       }">
-            <i class="fas ${link.icon}"></i>
+            <i class="fas ${link.icon} text-sm"></i>
         </span>
-        <span class="font-medium relative z-10 tracking-wide">${link.label}</span>
+        <span class="font-medium text-sm relative z-10 tracking-wide">${link.label}</span>
         ${(link.page === 'notifications' && state.unreadNotifications > 0) ? `
           <span class="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full relative z-10 animate-pulse shadow-md shadow-red-500/30">
             ${state.unreadNotifications > 99 ? '99+' : state.unreadNotifications}
@@ -115,6 +142,7 @@ function renderNavLinks(activePage) {
         ` : (isActive ? '<i class="fas fa-chevron-right ml-auto text-xs opacity-80 relative z-10"></i>' : '')}
       </button>
     `;
+    return sectionHtml + buttonHtml;
   }).join('');
 }
 
@@ -165,7 +193,10 @@ async function render() {
       'reset-password': 'Reset Password',
       'reset-password': 'Reset Password',
       laporan: 'Laporan Kegiatan',
-      notifications: 'Pusat Notifikasi'
+      notifications: 'Pusat Notifikasi',
+      rpp: 'RPM Generator',
+      kisi: 'Asesmen',
+      slide: 'Slide Generator'
     };
     // announce disabled
 
@@ -177,6 +208,18 @@ async function render() {
     if (page === 'kalender') {
       const { initKalender } = await import('./pages/kalender.js');
       if (initKalender) setTimeout(() => initKalender(), 100);
+    }
+    if (page === 'rpp') {
+      const { initRpp } = await import('./pages/rpp.js');
+      setTimeout(() => initRpp(), 100);
+    }
+    if (page === 'kisi') {
+      const { initKisi } = await import('./pages/kisi.js');
+      setTimeout(() => initKisi(), 100);
+    }
+    if (page === 'slide') {
+      const { initSlide } = await import('./pages/slide.js');
+      setTimeout(() => initSlide(), 100);
     }
 
   } catch (e) {
@@ -315,10 +358,14 @@ async function render() {
                           <p class="text-sm font-bold text-[var(--color-text-primary)] truncate">${escapeHtml(state.user.nama)}</p>
                       </div>
                   </div>
-                ` : ''}
-                <button onclick="logout()" class="btn w-full bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400">
-                  <i class="fas fa-sign-out-alt w-5 mr-2"></i> Keluar
-                </button>
+                  <button onclick="logout()" class="btn w-full bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400">
+                    <i class="fas fa-sign-out-alt w-5 mr-2"></i> Keluar
+                  </button>
+                ` : `
+                  <button onclick="navigate('login')" class="btn btn-primary w-full shadow-lg shadow-primary-500/30">
+                    <i class="fas fa-sign-in-alt w-5 mr-2"></i> Masuk Akun
+                  </button>
+                `}
             </div>
           </div>
         </div>

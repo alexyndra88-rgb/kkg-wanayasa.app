@@ -101,6 +101,12 @@ app.route('/api/sekolah', sekolahRoutes);
 app.route('/api/settings', settingsRoutes);
 app.route('/api/profile', profileRoutes);
 app.route('/api/notifications', notificationRoutes);
+import rppRoutes from './routes/rpp';
+app.route('/api/rpp', rppRoutes);
+import kisiRoutes from './routes/kisi';
+app.route('/api/kisi', kisiRoutes);
+import presentationRoutes from './routes/presentation';
+app.route('/api/presentation', presentationRoutes);
 
 // Health check endpoint
 app.get('/api/health', (c) => {
