@@ -490,12 +490,23 @@ export async function renderAdmin() {
                 <button onclick="closeSekolahModal()" class="text-[var(--color-text-tertiary)] hover:text-red-500"><i class="fas fa-times"></i></button>
             </div>
             <form id="sekolah-form" onsubmit="saveSekolah(event)" class="p-6 space-y-4">
+                <input type="hidden" name="id_sekolah">
                 <input type="text" name="nama" placeholder="Nama Sekolah *" class="input-field w-full" required>
+                
+                <textarea name="alamat" placeholder="Alamat Sekolah" class="input-field w-full h-20 resize-none"></textarea>
+
                 <div class="grid grid-cols-2 gap-4">
                     <input type="text" name="npsn" placeholder="NPSN" class="input-field w-full">
                     <select name="tipe" class="input-field w-full"><option value="negeri">Negeri</option><option value="swasta">Swasta</option></select>
                 </div>
-                <input type="text" name="kepala_sekolah" placeholder="Kepala Sekolah" class="input-field w-full">
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="text" name="kepala_sekolah" placeholder="Nama Kepala Sekolah" class="input-field w-full">
+                    <input type="text" name="nip_kepala_sekolah" placeholder="NIP Kepala Sekolah" class="input-field w-full">
+                </div>
+
+                <input type="number" name="jumlah_guru" placeholder="Jumlah Guru" class="input-field w-full">
+
                 <div class="flex items-center gap-4">
                     <label class="flex items-center gap-2 text-sm text-[var(--color-text-primary)]"><input type="checkbox" name="is_sekretariat" class="accent-primary-500"> Sekretariat</label>
                     <label class="flex items-center gap-2 text-sm text-[var(--color-text-primary)]"><input type="checkbox" name="is_sekolah_penggerak" class="accent-primary-500"> Penggerak</label>
@@ -885,33 +896,56 @@ window.loadSekolah = async function () {
 window.showAddSekolahModal = function () {
   const modal = document.getElementById('sekolah-modal');
   modal.classList.remove('hidden');
-  document.getElementById('sekolah-form').reset();
-  document.getElementById('sekolah-modal-title').textContent = 'Tambah Sekolah';
-  // Clear hidden ID if any
   const form = document.getElementById('sekolah-form');
-  if (form.id_sekolah) form.id_sekolah.value = '';
+  form.reset();
+  form.id_sekolah.value = '';
+  document.getElementById('sekolah-modal-title').textContent = 'Tambah Sekolah';
+}
+
+window.editSekolah = function (sekolah) {
+  const modal = document.getElementById('sekolah-modal');
+  modal.classList.remove('hidden');
+  document.getElementById('sekolah-modal-title').textContent = 'Edit Sekolah';
+
+  const form = document.getElementById('sekolah-form');
+  form.id_sekolah.value = sekolah.id;
+  form.nama.value = sekolah.nama || '';
+  form.alamat.value = sekolah.alamat || '';
+  form.npsn.value = sekolah.npsn || '';
+  form.tipe.value = sekolah.tipe || 'negeri';
+  form.kepala_sekolah.value = sekolah.kepala_sekolah || '';
+  form.nip_kepala_sekolah.value = sekolah.nip_kepala_sekolah || '';
+  form.jumlah_guru.value = sekolah.jumlah_guru || '';
+  form.is_sekretariat.checked = !!sekolah.is_sekretariat;
+  form.is_sekolah_penggerak.checked = !!sekolah.is_sekolah_penggerak;
 }
 
 window.saveSekolah = async function (e) {
   e.preventDefault();
   const form = e.target;
+  const id = form.id_sekolah.value;
+
   // Collect data
   const data = {
     nama: form.nama.value,
+    alamat: form.alamat.value,
     npsn: form.npsn.value,
     tipe: form.tipe.value,
     kepala_sekolah: form.kepala_sekolah.value,
+    nip_kepala_sekolah: form.nip_kepala_sekolah.value,
+    jumlah_guru: form.jumlah_guru.value,
     is_sekretariat: form.is_sekretariat.checked,
     is_sekolah_penggerak: form.is_sekolah_penggerak.checked
   };
 
-  // Determine if update or create based on existence of ID
-  // Note: The current modal form structure in the render function didn't have a hidden ID field. 
-  // We should treat this as a create function unless we implement edit mode fuller.
-  // For now assuming create only or simple toggle.
   try {
-    await api('/sekolah', { method: 'POST', body: data });
-    showToast('Sekolah berhasil disimpan', 'success');
+    if (id) {
+      await api(`/sekolah/${id}`, { method: 'PUT', body: data });
+      showToast('Sekolah berhasil diperbarui', 'success');
+    } else {
+      await api('/sekolah', { method: 'POST', body: data });
+      showToast('Sekolah berhasil ditambahkan', 'success');
+    }
     document.getElementById('sekolah-modal').classList.add('hidden');
     loadSekolah();
   } catch (e) { showToast(e.message, 'error'); }
