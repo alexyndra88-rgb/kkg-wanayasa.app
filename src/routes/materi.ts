@@ -4,6 +4,7 @@ import { successResponse, Errors, validateRequired } from '../lib/response';
 import type { CreateMateriRequest, MateriWithUploader } from '../types';
 
 import { uploadFile, deleteFile, StorageBindings } from '../lib/storage';
+import { createBulkNotifications } from '../lib/notification';
 
 type Bindings = {
   DB: D1Database;
@@ -141,6 +142,25 @@ materi.post('/', async (c) => {
       fileSize,
       user.id
     ).run();
+
+    // 🔔 Notify all users about new material
+    try {
+      const { results } = await c.env.DB.prepare('SELECT id FROM users WHERE id != ?').bind(user.id).all();
+      const recipientIds = results.map((u: any) => u.id as number);
+
+      if (recipientIds.length > 0) {
+        await createBulkNotifications(
+          c.env.DB,
+          recipientIds,
+          'Materi Baru 📚',
+          `"${judul}" (${jenjang || 'Umum'}) baru saja ditambahkan oleh ${user.nama}.`,
+          'info',
+          '/materi'
+        );
+      }
+    } catch (notifError) {
+      console.error('Failed to send notifications:', notifError);
+    }
 
     return successResponse(c, {
       id: result.meta.last_row_id,

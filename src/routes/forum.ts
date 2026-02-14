@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { getCurrentUser, getCookie } from '../lib/auth';
 import { successResponse, Errors, validateRequired } from '../lib/response';
 import type { CreateThreadRequest, CreateReplyRequest, ForumThreadWithAuthor, ForumReplyWithAuthor } from '../types';
+import { createNotification } from '../lib/notification';
 
 type Bindings = { DB: D1Database };
 
@@ -152,7 +153,7 @@ forum.post('/threads/:id/reply', async (c) => {
 
     // Check thread exists
     const thread: any = await c.env.DB.prepare(
-      'SELECT id FROM forum_threads WHERE id = ?'
+      'SELECT id, user_id, judul FROM forum_threads WHERE id = ?'
     ).bind(id).first();
 
     if (!thread) {
@@ -171,6 +172,20 @@ forum.post('/threads/:id/reply', async (c) => {
       SET reply_count = reply_count + 1, updated_at = datetime('now')
       WHERE id = ?
     `).bind(id).run();
+
+    // 🔔 Notify thread owner
+    if (thread.user_id !== user.id) {
+      try {
+        await createNotification(
+          c.env.DB,
+          thread.user_id,
+          'Balasan Baru 💬',
+          `${user.nama} membalas diskusi "${thread.judul}".`,
+          'info',
+          `/forum` // Ideally /forum/threads/:id but UI doesn't support deep link yet? use /forum
+        );
+      } catch (e) { console.error(e); }
+    }
 
     return successResponse(c, {
       id: result.meta.last_row_id,

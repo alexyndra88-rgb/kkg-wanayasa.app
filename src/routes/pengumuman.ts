@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { getCurrentUser, getCookie } from '../lib/auth';
 import { successResponse, Errors, validateRequired } from '../lib/response';
 import type { CreatePengumumanRequest, PengumumanWithAuthor } from '../types';
+import { createBulkNotifications } from '../lib/notification';
 
 type Bindings = { DB: D1Database };
 
@@ -76,6 +77,25 @@ pengumuman.post('/', async (c) => {
       is_pinned ? 1 : 0,
       user.id
     ).run();
+
+    // 🔔 Broadcast Notification
+    try {
+      const { results } = await c.env.DB.prepare('SELECT id FROM users WHERE id != ?').bind(user.id).all();
+      const recipientIds = results.map((u: any) => u.id as number);
+
+      if (recipientIds.length > 0) {
+        await createBulkNotifications(
+          c.env.DB,
+          recipientIds,
+          'Pengumuman Baru 📢',
+          `"${judul}" telah diterbitkan oleh Admin.`,
+          is_pinned ? 'warning' : 'info',
+          '/pengumuman'
+        );
+      }
+    } catch (err) {
+      console.error('Failed to broadcast pengumuman:', err);
+    }
 
     return successResponse(c, {
       id: result.meta.last_row_id,
