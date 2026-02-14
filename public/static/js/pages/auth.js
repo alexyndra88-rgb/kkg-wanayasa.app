@@ -213,13 +213,7 @@ export function renderLogin() {
             </div>
           </form>
 
-          <!-- Demo Credentials -->
-          <div class="mt-8 p-4 bg-indigo-500/10 rounded-xl border border-indigo-500/20 backdrop-blur-sm">
-            <p class="text-xs text-indigo-200 text-center">
-              <i class="fas fa-info-circle mr-1"></i>
-              <strong>Demo Account:</strong> admin@kkg-wanayasa.id / admin123
-            </p>
-          </div>
+
         </div>
 
         <!-- Back to Home -->
