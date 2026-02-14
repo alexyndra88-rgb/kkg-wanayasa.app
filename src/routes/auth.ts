@@ -18,6 +18,7 @@ import {
   changePasswordSchema
 } from '../lib/validation';
 import { logger } from '../lib/logger';
+import { createAuditLog } from '../lib/audit';
 import type { User, LoginRequest, RegisterRequest } from '../types';
 
 type Bindings = { DB: D1Database };
@@ -103,6 +104,14 @@ auth.post('/login', rateLimitMiddleware(RATE_LIMITS.auth), async (c) => {
     c.res.headers.append('Set-Cookie', `csrf_token=${csrfToken}; Path=/; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}${isProduction ? '; Secure' : ''}`);
 
     logger.auth('login', user.id, { email: user.email });
+
+    // Audit Log
+    await createAuditLog(c.env.DB, {
+      user_id: user.id,
+      action: 'USER_LOGIN',
+      ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown',
+      user_agent: c.req.header('User-Agent') || 'unknown'
+    });
 
     return successResponse(c, {
       user: {
@@ -227,6 +236,13 @@ auth.post('/logout', async (c) => {
 
       if (session) {
         logger.auth('logout', session.user_id);
+
+        await createAuditLog(c.env.DB, {
+          user_id: session.user_id,
+          action: 'USER_LOGOUT',
+          ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown',
+          user_agent: c.req.header('User-Agent') || 'unknown'
+        });
       }
     }
 

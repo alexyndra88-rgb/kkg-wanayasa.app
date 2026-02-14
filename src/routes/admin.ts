@@ -164,6 +164,7 @@ admin.put('/settings', async (c) => {
 });
 
 // Upload KKG Logo
+// Upload KKG Logo
 admin.post('/settings/logo', async (c) => {
   try {
     const currentUser: any = c.get('user');
@@ -173,11 +174,17 @@ admin.post('/settings/logo', async (c) => {
       return Errors.validation(c, 'Content-Type harus multipart/form-data');
     }
 
-    const formData = await c.req.formData();
-    const file = formData.get('logo') as File;
+    let file: File | undefined;
+    try {
+      const body = await c.req.parseBody();
+      file = body['logo'] as File;
+    } catch (e) {
+      console.error('Body parsing error:', e);
+      return Errors.validation(c, 'Gagal membaca file upload. Mungkin ukuran file terlalu besar.');
+    }
 
-    if (!file) {
-      return Errors.validation(c, 'File logo tidak ditemukan');
+    if (!file || typeof file === 'string') {
+      return Errors.validation(c, 'File logo tidak valid');
     }
 
     // Validate file type
@@ -186,57 +193,52 @@ admin.post('/settings/logo', async (c) => {
       return Errors.validation(c, 'Tipe file tidak didukung. Gunakan PNG, JPEG, GIF, atau WebP');
     }
 
-    // Validate file size (max 2MB)
+    // Supabase Upload Logic
+    const { uploadFile } = await import('../lib/storage');
+    // Using explicit cast to any for env to satisfy StorageBindings check inside uploadFile if needed, 
+    // or better, validate env first. But uploadFile does check env.
+
+    // Check file size for Supabase (e.g. 2MB limit same as before)
     if (file.size > 2 * 1024 * 1024) {
       return Errors.validation(c, 'Ukuran file maksimal 2MB');
     }
 
-    // Check if R2 bucket is available
-    const bucket = (c.env as any).BUCKET;
-    if (!bucket) {
-      // Fallback: store as base64 data URL
-      const arrayBuffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      const dataUrl = `data:${file.type};base64,${base64}`;
+    const result = await uploadFile(c.env as any, file, 'logos');
 
-      await c.env.DB.prepare(`
+    if (result.error) {
+      console.error('Supabase upload error:', result.error);
+
+      // Fallback to DB if Supabase fails? 
+      // No, user specifically said they use Supabase and NOT R2. 
+      // If Supabase is not configured, we should error out or maybe fallback to DB if absolutely necessary but let's stick to Supabase first as requested.
+      // Actually, for small files (logos), DB fallback is still useful for dev/quickstart without config.
+      // But user request "cek secara mendalam bagian mana yang masih berhubungan dengan R2" implies they want R2 GONE.
+
+      return Errors.internal(c, 'Gagal mengupload logo ke Supabase: ' + result.error);
+    }
+
+    const logoUrl = result.url;
+
+    await c.env.DB.prepare(`
         INSERT INTO settings (key, value, updated_at) 
         VALUES ('logo_url', ?, datetime('now'))
         ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')
-      `).bind(dataUrl, dataUrl).run();
-
-      return successResponse(c, { logo_url: dataUrl }, 'Logo berhasil diupload');
-    }
-
-    // Upload to R2
-    const key = `logos/kkg-logo-${Date.now()}.${file.name.split('.').pop()}`;
-    const arrayBuffer = await file.arrayBuffer();
-
-    await bucket.put(key, arrayBuffer, {
-      httpMetadata: { contentType: file.type }
-    });
-
-    // Save logo URL to settings
-    const logoUrl = `/api/files/${key}`;
-    await c.env.DB.prepare(`
-      INSERT INTO settings (key, value, updated_at) 
-      VALUES ('logo_url', ?, datetime('now'))
-      ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')
     `).bind(logoUrl, logoUrl).run();
 
     // Audit log
     await createAuditLog(c.env.DB, {
       user_id: currentUser.id,
       action: 'SETTINGS_UPDATE',
-      details: { action: 'upload_logo', file_name: file.name },
+      details: { action: 'upload_logo', file_name: file.name, storage: 'supabase' },
       ip_address: c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For'),
       user_agent: c.req.header('User-Agent')
     });
 
     return successResponse(c, { logo_url: logoUrl }, 'Logo berhasil diupload');
+
   } catch (e: any) {
     console.error('Upload logo error:', e);
-    return Errors.internal(c);
+    return Errors.internal(c, 'Gagal mengupload logo: ' + e.message);
   }
 });
 

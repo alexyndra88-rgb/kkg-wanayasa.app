@@ -9,5 +9,6 @@ export const state = {
         alamat_sekretariat: 'SDN 1 Wanayasa, Kec. Wanayasa, Kab. Purwakarta',
         nama_kkg: 'KKG Gugus 3 Wanayasa',
         email: 'admin@kkg-wanayasa.id'
-    }
+    },
+    unreadNotifications: 0
 };

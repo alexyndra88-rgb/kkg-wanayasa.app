@@ -3,7 +3,11 @@ import { getCurrentUser, getCookie } from '../lib/auth';
 import { successResponse, Errors, validateRequired } from '../lib/response';
 import type { User, UserPublic } from '../types';
 
-type Bindings = { DB: D1Database };
+import { uploadFile, deleteFile, StorageBindings } from '../lib/storage';
+
+type Bindings = {
+  DB: D1Database;
+} & StorageBindings;
 
 const guru = new Hono<{ Bindings: Bindings }>();
 
@@ -88,15 +92,45 @@ guru.put('/profile', async (c) => {
   }
 
   try {
-    const { nama, nip, sekolah, mata_pelajaran, no_hp, alamat } = await c.req.json();
+    const body: any = await c.req.parseBody();
+    const nama = body.nama as string;
+    const nip = body.nip as string;
+    const sekolah = body.sekolah as string;
+    const mata_pelajaran = body.mata_pelajaran as string;
+    const no_hp = body.no_hp as string;
+    const alamat = body.alamat as string;
+    const foto = body.foto as File;
 
     if (!nama || nama.trim().length < 2) {
       return Errors.validation(c, 'Nama minimal 2 karakter');
     }
 
+    let fotoUrl = user.foto_url;
+
+    // Handle photo upload
+    if (foto && typeof foto === 'object' && foto.name) {
+      console.log('Processing profile photo upload:', foto.name, foto.type, foto.size);
+
+      // Validate image type
+      if (!foto.type || !foto.type.startsWith('image/')) {
+        return Errors.validation(c, 'File harus berupa gambar valid');
+      }
+
+      // Max size 5MB
+      if (foto.size > 5 * 1024 * 1024) {
+        return Errors.validation(c, 'Ukuran foto maksimal 5MB');
+      }
+
+      const uploadResult = await uploadFile(c.env, foto, 'profiles');
+      if (uploadResult.error) {
+        return Errors.internal(c, `Upload foto gagal: ${uploadResult.error}`);
+      }
+      fotoUrl = uploadResult.url;
+    }
+
     await c.env.DB.prepare(`
       UPDATE users 
-      SET nama = ?, nip = ?, sekolah = ?, mata_pelajaran = ?, no_hp = ?, alamat = ?, updated_at = datetime('now')
+      SET nama = ?, nip = ?, sekolah = ?, mata_pelajaran = ?, no_hp = ?, alamat = ?, foto_url = ?, updated_at = datetime('now')
       WHERE id = ?
     `).bind(
       nama.trim(),
@@ -105,6 +139,7 @@ guru.put('/profile', async (c) => {
       mata_pelajaran?.trim() || null,
       no_hp?.trim() || null,
       alamat?.trim() || null,
+      fotoUrl,
       user.id
     ).run();
 

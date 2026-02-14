@@ -15,6 +15,8 @@ function renderMateriCard(m) {
   const avgRating = m.avg_rating || 0;
   const totalReviews = m.total_reviews || 0;
 
+  const isOwner = state.user && (state.user.id === m.uploaded_by || state.user.role === 'admin');
+
   // Generate star display
   const stars = Array(5).fill(0).map((_, i) => {
     if (i + 1 <= Math.floor(avgRating)) return '<i class="fas fa-star text-yellow-400"></i>';
@@ -52,6 +54,12 @@ function renderMateriCard(m) {
               class="text-xs text-[var(--color-text-secondary)] hover:text-primary-600 transition-colors tooltip" title="Lihat Review">
              <i class="far fa-comment-dots text-sm"></i>
            </button>
+           
+           ${isOwner ? `
+           <button onclick="showEditMateri(${m.id})" 
+              class="text-xs text-[var(--color-text-secondary)] hover:text-orange-500 transition-colors tooltip" title="Edit Materi">
+             <i class="fas fa-edit text-sm"></i>
+           </button>` : ''}
         </div>
         
         <div class="flex items-center gap-3">
@@ -110,19 +118,24 @@ export async function renderMateri() {
       
       <div class="w-px bg-[var(--color-border-subtle)] hidden md:block"></div>
       
+
+
+      <div class="w-px bg-[var(--color-border-subtle)] hidden md:block"></div>
+      
       <div class="relative min-w-[160px]">
         <select id="filter-jenjang" onchange="filterMateri()" class="w-full pl-4 pr-10 py-2.5 bg-transparent border-none focus:ring-0 text-[var(--color-text-primary)] text-sm font-medium cursor-pointer appearance-none">
-          <option value="">Semua Jenjang</option>
-          <option value="SD">SD</option><option value="SMP">SMP</option><option value="SMA">SMA</option>
+          <option value="">Semua Kelas</option>
+          <option value="Kelas 1">Kelas 1</option>
+          <option value="Kelas 2">Kelas 2</option>
+          <option value="Kelas 3">Kelas 3</option>
+          <option value="Kelas 4">Kelas 4</option>
+          <option value="Kelas 5">Kelas 5</option>
+          <option value="Kelas 6">Kelas 6</option>
         </select>
         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[var(--color-text-tertiary)]">
           <i class="fas fa-chevron-down text-xs"></i>
         </div>
-      </div>
-
-      <div class="w-px bg-[var(--color-border-subtle)] hidden md:block"></div>
-
-      <div class="flex-1 relative">
+      </div>      <div class="flex-1 relative">
         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <i class="fas fa-search text-[var(--color-text-tertiary)]"></i>
         </div>
@@ -204,10 +217,17 @@ window.showUploadMateri = function () {
               </div>
               
               <div>
-                <label class="block text-sm font-semibold text-[var(--color-text-secondary)] mb-2">Jenjang</label>
+                <label class="block text-sm font-semibold text-[var(--color-text-secondary)] mb-2">Kelas</label>
                 <div class="relative">
                   <select name="jenjang" class="w-full px-4 py-3 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-xl focus:ring-2 focus:ring-primary-500 transition text-[var(--color-text-primary)] appearance-none">
-                    <option value="">Pilih Jenjang</option><option value="SD">SD</option><option value="SMP">SMP</option><option value="SMA">SMA</option>
+                    <option value="">Pilih Kelas</option>
+                    <option value="Kelas 1">Kelas 1</option>
+                    <option value="Kelas 2">Kelas 2</option>
+                    <option value="Kelas 3">Kelas 3</option>
+                    <option value="Kelas 4">Kelas 4</option>
+                    <option value="Kelas 5">Kelas 5</option>
+                    <option value="Kelas 6">Kelas 6</option>
+                    <option value="Lainnya">Lainnya</option>
                   </select>
                   <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[var(--color-text-tertiary)]"><i class="fas fa-chevron-down text-xs"></i></div>
                 </div>
@@ -347,71 +367,71 @@ async function uploadFile(file) {
       csrfToken = await refreshCsrfToken();
     }
 
-    // Upload using fetch for progress (simulated)
-    // Note: XMLHttpRequest is better for real progress, but fetch is modern. 
-    // We'll proceed with fetch + interval simulation like before.
-
+    // Indicate upload starting
     let prog = 0;
     const progressInterval = setInterval(() => {
-      prog = Math.min(prog + Math.random() * 10, 90);
-      progressBar.style.width = prog + '%';
-      progressText.textContent = Math.round(prog) + '%';
-    }, 200);
+      prog = Math.min(prog + Math.random() * 20, 95);
+      if (progressBar) progressBar.style.width = prog + '%';
+      if (progressText) progressText.textContent = Math.round(prog) + '%';
+    }, 400);
 
-    let response = await fetch('/api/files/upload', {
+    // Perform Upload
+    // Note: We use raw fetch because the api() wrapper sets validation headers that interfere with FormData boundary
+    const response = await fetch('/api/files/upload', {
       method: 'POST',
       body: formData,
-      credentials: 'include',
-      headers: { 'X-CSRF-Token': csrfToken || '' }
+      headers: {
+        'X-CSRF-Token': csrfToken || ''
+      }
     });
 
-    // CSRF retry logic skipped for brevity, assumed handled by api wrapper usually but here we use raw fetch
-    // Adding retry quickly:
-    if (response.status === 403) {
-      csrfToken = await refreshCsrfToken();
-      if (csrfToken) {
-        response = await fetch('/api/files/upload', {
-          method: 'POST', body: formData, credentials: 'include', headers: { 'X-CSRF-Token': csrfToken }
-        });
-      }
-    }
-
     clearInterval(progressInterval);
-    const result = await response.json();
 
-    if (result.success) {
-      progressBar.style.width = '100%';
-      progressText.textContent = '100%';
-
-      currentUploadedFile = result.data;
-      document.getElementById('file-key-input').value = result.data.key;
-
-      content.innerHTML = `
-                <div class="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-3">
-                   <i class="fas fa-check text-2xl text-green-500"></i>
-                </div>
-                <p class="text-[var(--color-text-primary)] font-medium truncate max-w-[200px] mx-auto">${escapeHtml(file.name)}</p>
-                <div class="flex gap-2 justify-center mt-3">
-                   <button type="button" onclick="removeUploadedFile()" class="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1 bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors">
-                       Hapus
-                   </button>
-                   <span class="text-xs text-green-600 dark:text-green-400 font-medium px-3 py-1 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                       Sukses
-                   </span>
-                </div>
-            `;
-
-      showToast('File berhasil diupload', 'success');
-    } else {
-      throw new Error(result.error?.message || 'Gagal mengupload file');
+    let result;
+    try {
+      result = await response.json();
+    } catch (e) {
+      throw new Error('Gagal memproses respon server');
     }
-  } catch (e) {
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error?.message || result.message || 'Gagal mengupload file');
+    }
+
+    // Success Handling
+    if (progressBar) progressBar.style.width = '100%';
+    if (progressText) progressText.textContent = '100%';
+
+    currentUploadedFile = result.data;
+    const keyInput = document.getElementById('file-key-input');
+    if (keyInput) keyInput.value = result.data.key;
+
     content.innerHTML = `
+            <div class="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-3">
+                <i class="fas fa-check text-2xl text-green-500"></i>
+            </div>
+            <p class="text-[var(--color-text-primary)] font-medium truncate max-w-[200px] mx-auto">${escapeHtml(file.name)}</p>
+            <div class="flex gap-2 justify-center mt-3">
+                <button type="button" onclick="removeUploadedFile()" class="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1 bg-red-50 dark:bg-red-900/20 rounded-lg transition-colors">
+                    Hapus
+                </button>
+                <span class="text-xs text-green-600 dark:text-green-400 font-medium px-3 py-1 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    Sukses
+                </span>
+            </div>
+        `;
+
+    showToast('File berhasil diupload', 'success');
+
+  } catch (e) {
+    if (content) {
+      content.innerHTML = `
             <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-3"></i>
             <p class="text-[var(--color-text-primary)]">${escapeHtml(e.message || 'Gagal mengupload file')}</p>
             <button type="button" onclick="document.getElementById('file-input').click()" class="text-xs text-orange-500 hover:text-orange-600 mt-2 font-medium">Coba lagi</button>
         `;
-    progress.classList.add('hidden');
+    }
+    if (progress) progress.classList.add('hidden');
     showToast(e.message || 'Gagal mengupload file', 'error');
   }
 }
@@ -708,4 +728,132 @@ window.closeReviewModal = function () {
   }
   currentReviewMateriId = null;
   currentUserRating = 0;
+}
+
+// ============================================
+// Edit Materi Functions
+// ============================================
+
+let currentEditMateriId = null;
+
+window.showEditMateri = async function (id) {
+  try {
+    const res = await api(`/materi/${id}`);
+    const m = res.data;
+    currentEditMateriId = id;
+    currentUploadedFile = null;
+
+    const container = document.getElementById('upload-materi-modal');
+    container.classList.remove('hidden');
+
+    container.innerHTML = `
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" aria-hidden="true" onclick="document.getElementById('upload-materi-modal').classList.add('hidden')"></div>
+      
+      <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+      
+      <div class="inline-block align-bottom bg-[var(--color-bg-elevated)] rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-[var(--color-border-subtle)]">
+        <div class="bg-[var(--color-bg-tertiary)] px-6 py-4 border-b border-[var(--color-border-subtle)] flex justify-between items-center">
+          <h3 class="font-bold text-[var(--color-text-primary)] text-lg"><i class="fas fa-edit text-orange-500 mr-2"></i>Edit Materi</h3>
+          <button onclick="document.getElementById('upload-materi-modal').classList.add('hidden')" class="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="p-6">
+          <form onsubmit="updateMateri(event)" class="space-y-6">
+            <div class="grid md:grid-cols-2 gap-6">
+              <div class="md:col-span-2">
+                <label class="block text-sm font-semibold text-[var(--color-text-secondary)] mb-2">Judul Materi</label>
+                <input type="text" name="judul" value="${escapeHtml(m.judul)}" required class="w-full px-4 py-3 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-xl focus:ring-2 focus:ring-primary-500 transition text-[var(--color-text-primary)]">
+              </div>
+              
+              <div class="md:col-span-2">
+                <label class="block text-sm font-semibold text-[var(--color-text-secondary)] mb-2">Deskripsi</label>
+                <textarea name="deskripsi" rows="2" class="w-full px-4 py-3 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-xl focus:ring-2 focus:ring-primary-500 transition text-[var(--color-text-primary)] resize-none">${escapeHtml(m.deskripsi || '')}</textarea>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-[var(--color-text-secondary)] mb-2">Jenis Materi</label>
+                <div class="relative">
+                  <select name="jenis" class="w-full px-4 py-3 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-xl focus:ring-2 focus:ring-primary-500 transition text-[var(--color-text-primary)] appearance-none">
+                    <option value="">Pilih Jenis</option>
+                    ${['RPP', 'Modul', 'Silabus', 'Media Ajar', 'Soal', 'Lainnya'].map(opt => `<option value="${opt}" ${m.jenis === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[var(--color-text-tertiary)]"><i class="fas fa-chevron-down text-xs"></i></div>
+                </div>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-semibold text-[var(--color-text-secondary)] mb-2">Kelas</label>
+                <div class="relative">
+                  <select name="jenjang" class="w-full px-4 py-3 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-xl focus:ring-2 focus:ring-primary-500 transition text-[var(--color-text-primary)] appearance-none">
+                    <option value="">Pilih Kelas</option>
+                    ${['Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6', 'Lainnya'].map(opt => `<option value="${opt}" ${m.jenjang === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                  </select>
+                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[var(--color-text-tertiary)]"><i class="fas fa-chevron-down text-xs"></i></div>
+                </div>
+              </div>
+              
+              <div class="md:col-span-2">
+                <label class="block text-sm font-semibold text-[var(--color-text-secondary)] mb-2">Kategori / Mata Pelajaran</label>
+                <input type="text" name="kategori" value="${escapeHtml(m.kategori || '')}" class="w-full px-4 py-3 bg-[var(--color-bg-primary)] border border-[var(--color-border-default)] rounded-xl focus:ring-2 focus:ring-primary-500 transition text-[var(--color-text-primary)]">
+              </div>
+            </div>
+            
+            <div class="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 text-sm text-blue-800 dark:text-blue-300">
+                <i class="fas fa-info-circle mr-2"></i> Saat ini edit file belum didukung. Silakan hapus dan upload ulang jika ingin mengganti file.
+            </div>
+
+            <div class="pt-4 border-t border-[var(--color-border-subtle)] flex gap-3 justify-end">
+              <button type="button" onclick="document.getElementById('upload-materi-modal').classList.add('hidden')" class="px-6 py-2.5 bg-[var(--color-bg-secondary)] border border-[var(--color-border-default)] text-[var(--color-text-secondary)] rounded-xl font-medium hover:bg-[var(--color-bg-tertiary)] transition-colors">Batal</button>
+              <button type="submit" id="update-materi-btn" class="btn btn-primary shadow-lg shadow-orange-500/20 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 border-none px-8">
+                <i class="fas fa-save mr-2"></i>Update Materi
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>`;
+
+  } catch (e) {
+    showToast('Gagal memuat data materi', 'error');
+    console.error(e);
+  }
+}
+
+window.updateMateri = async function (e) {
+  e.preventDefault();
+  const form = e.target;
+  const btn = document.getElementById('update-materi-btn');
+
+  if (!currentEditMateriId) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+
+  try {
+    const payload = {
+      judul: form.judul.value,
+      deskripsi: form.deskripsi.value,
+      jenis: form.jenis.value,
+      jenjang: form.jenjang.value,
+      kategori: form.kategori.value
+    };
+
+    await api(`/materi/${currentEditMateriId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    showToast('Materi berhasil diupdate!', 'success');
+    document.getElementById('upload-materi-modal').classList.add('hidden');
+    // Reload list
+    setTimeout(() => window.location.reload(), 500);
+  } catch (e) {
+    showToast(e.message || 'Gagal update materi', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-save mr-2"></i>Update Materi';
+  }
 }

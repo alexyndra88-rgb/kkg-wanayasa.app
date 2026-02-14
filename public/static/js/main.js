@@ -11,6 +11,7 @@ import { renderNavbar, renderFooter, toggleMobileMenu } from './components.js';
 // Theme & Accessibility
 import { initTheme, toggleTheme, renderThemeToggle } from './theme.js';
 import { initA11y, announce, renderSkipLinks } from './a11y.js';
+import { fetchUnreadCount } from './notifications.js';
 
 // Pages
 // Pages are now loaded dynamically
@@ -56,15 +57,17 @@ const pages = {
   kalender: async () => (await import('./pages/kalender.js')).renderKalender(),
   'reset-password': async () => (await import('./pages/reset-password.js')).renderResetPassword(),
   laporan: async () => (await import('./pages/laporan.js')).renderLaporan(),
+  notifications: async () => (await import('./pages/notifications.js')).renderNotifications(),
 };
 
 // Protected pages (require authentication)
-const protectedPages = ['surat', 'proker', 'absensi', 'profile'];
+const protectedPages = ['surat', 'proker', 'absensi', 'profile', 'notifications'];
 const adminPages = ['admin'];
 
 // Navigation Links Configuration
 const navLinks = [
   { page: 'home', label: 'Beranda', icon: 'fa-home', public: true },
+  { page: 'notifications', label: 'Notifikasi', icon: 'fa-bell', auth: true },
   { page: 'pengumuman', label: 'Pengumuman', icon: 'fa-bullhorn', public: true },
   { page: 'surat', label: 'Generator Surat', icon: 'fa-file-alt', admin: true },
   { page: 'proker', label: 'Program Kerja', icon: 'fa-tasks', admin: true },
@@ -74,6 +77,7 @@ const navLinks = [
   { page: 'materi', label: 'Materi', icon: 'fa-book-open', public: true },
   { page: 'guru', label: 'Direktori Guru', icon: 'fa-users', public: true },
   { page: 'forum', label: 'Forum', icon: 'fa-comments', public: true },
+  { page: 'profile', label: 'Pengaturan Akun', icon: 'fa-user-cog', auth: true },
   { page: 'admin', label: 'Panel Admin', icon: 'fa-cog', admin: true },
 ];
 
@@ -104,7 +108,11 @@ function renderNavLinks(activePage) {
             <i class="fas ${link.icon}"></i>
         </span>
         <span class="font-medium relative z-10 tracking-wide">${link.label}</span>
-        ${isActive ? '<i class="fas fa-chevron-right ml-auto text-xs opacity-80 relative z-10"></i>' : ''}
+        ${(link.page === 'notifications' && state.unreadNotifications > 0) ? `
+          <span class="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full relative z-10 animate-pulse shadow-md shadow-red-500/30">
+            ${state.unreadNotifications > 99 ? '99+' : state.unreadNotifications}
+          </span>
+        ` : (isActive ? '<i class="fas fa-chevron-right ml-auto text-xs opacity-80 relative z-10"></i>' : '')}
       </button>
     `;
   }).join('');
@@ -233,9 +241,9 @@ async function render() {
 
           <div class="p-4 border-t border-[var(--color-border-subtle)] bg-[var(--color-bg-tertiary)]/30 backdrop-blur-sm">
             ${state.user ? `
-              <div class="group relative bg-[var(--color-bg-elevated)] border border-[var(--color-border-default)] rounded-2xl p-3 mb-3 cursor-pointer hover:border-primary-300 transition-colors shadow-sm card-hover">
+              <div onclick="navigate('profile')" class="group relative bg-[var(--color-bg-elevated)] border border-[var(--color-border-default)] rounded-2xl p-3 mb-3 cursor-pointer hover:border-primary-300 transition-colors shadow-sm card-hover">
                   <div class="flex items-center gap-3">
-                    ${avatar(state.user.nama, 'sm')}
+                    ${avatar(state.user.nama, 'sm', state.user.foto_url)}
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-bold text-[var(--color-text-primary)] truncate group-hover:text-primary-600 transition-colors">${escapeHtml(state.user.nama)}</p>
                         <p class="text-xs text-[var(--color-text-secondary)] truncate">${escapeHtml(state.user.role)}</p>
@@ -297,7 +305,7 @@ async function render() {
             <div class="pt-6 border-t border-[var(--color-border-subtle)]">
                 ${state.user ? `
                   <div class="flex items-center gap-3 mb-4 p-2 bg-[var(--color-bg-tertiary)] rounded-lg">
-                      ${avatar(state.user.nama, 'sm')}
+                      ${avatar(state.user.nama, 'sm', state.user.foto_url)}
                       <div class="min-w-0">
                           <p class="text-sm font-bold text-[var(--color-text-primary)] truncate">${escapeHtml(state.user.nama)}</p>
                       </div>
@@ -418,6 +426,20 @@ async function init() {
     if (res.success && res.data?.user) {
       state.user = res.data.user;
       console.log('✅ User session restored:', state.user.nama);
+      // Start polling notifications
+      fetchUnreadCount();
+      setInterval(() => {
+        if (state.user) fetchUnreadCount();
+      }, 60000);
+
+      // Listen for notification updates
+      document.addEventListener('notifications-updated', () => {
+        const sidebarNav = document.querySelector('aside nav');
+        if (sidebarNav) sidebarNav.innerHTML = renderNavLinks(state.currentPage);
+
+        const mobileNav = document.querySelector('#mobile-menu nav');
+        if (mobileNav) mobileNav.innerHTML = renderNavLinks(state.currentPage);
+      });
     }
   } catch (e) {
     // Not logged in or session expired, that's fine
@@ -465,6 +487,30 @@ async function init() {
 
   console.log('✅ KKG Portal initialized');
 }
+
+
+
+// Logout handler
+window.logout = async function () {
+  if (!confirm('Apakah Anda yakin ingin keluar?')) return;
+
+  try {
+    await api('/auth/logout', { method: 'POST' });
+  } catch (e) {
+    console.warn('Logout server error:', e);
+  }
+
+  state.user = null;
+  showToast('Logout berhasil', 'success');
+
+  // Clear any local storage
+  if (localStorage.getItem('user')) {
+    localStorage.removeItem('user');
+  }
+
+  // Redirect
+  navigate('home');
+};
 
 // Start the app
 init().catch(e => {

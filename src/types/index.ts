@@ -326,3 +326,16 @@ export interface PaginatedResult<T> {
         hasMore: boolean;
     };
 }
+
+// ============== Notifications ==============
+
+export interface Notification {
+    id: number;
+    user_id: number;
+    type: 'info' | 'success' | 'warning' | 'error';
+    title: string;
+    message: string;
+    link?: string;
+    is_read: boolean;
+    created_at: string;
+}

@@ -13,5 +13,10 @@
       "database_id": "c82b3f88-502d-4bc5-a7fa-2aa651928399"
     }
   ],
-  "r2_buckets": []
+  "r2_buckets": [],
+  "vars": {
+    "SUPABASE_URL": "https://mytonopqqqxlwywqbadt.supabase.co",
+    "SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15dG9ub3BxcXF4bHd5d3FiYWR0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MTAwNDM0NywiZXhwIjoyMDg2NTgwMzQ3fQ.mGseP_Hi1KYsw2NH-INGGwbncfWSVYi97btDt6clBRY",
+    "SUPABASE_BUCKET": "materi-kkg"
+  }
 }

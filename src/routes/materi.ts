@@ -3,7 +3,11 @@ import { getCurrentUser, getCookie } from '../lib/auth';
 import { successResponse, Errors, validateRequired } from '../lib/response';
 import type { CreateMateriRequest, MateriWithUploader } from '../types';
 
-type Bindings = { DB: D1Database };
+import { uploadFile, deleteFile, StorageBindings } from '../lib/storage';
+
+type Bindings = {
+  DB: D1Database;
+} & StorageBindings;
 
 const materi = new Hono<{ Bindings: Bindings }>();
 
@@ -64,18 +68,33 @@ materi.post('/', async (c) => {
   }
 
   try {
-    const body = await c.req.json();
+    const contentType = c.req.header('Content-Type') || '';
+    let body: any = {};
+    try {
+      if (contentType.includes('application/json')) {
+        body = await c.req.json();
+      } else {
+        body = await c.req.parseBody();
+      }
+    } catch (e) {
+      return Errors.validation(c, 'Invalid request body');
+    }
 
-    const validation = validateRequired(body, ['judul']);
-    if (!validation.valid) {
+    const judul = body.judul as string;
+    const deskripsi = body.deskripsi as string;
+    const kategori = body.kategori as string;
+    const jenjang = body.jenjang as string;
+    const jenis = body.jenis as string;
+    const file = body.file as File;
+
+    if (!judul) {
       return Errors.validation(c, 'Judul materi harus diisi');
     }
 
-    const { judul, deskripsi, kategori, jenjang, jenis, file_url, file_key, file_name, file_size } = body;
-
     // Validate jenjang if provided
-    if (jenjang && !['SD', 'SMP', 'SMA'].includes(jenjang)) {
-      return Errors.validation(c, 'Jenjang tidak valid');
+    const validJenjang = ['SD', 'Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6', 'Lainnya'];
+    if (jenjang && !validJenjang.includes(jenjang)) {
+      return Errors.validation(c, 'Jenjang/Kelas tidak valid');
     }
 
     // Validate jenis if provided
@@ -84,46 +103,71 @@ materi.post('/', async (c) => {
       return Errors.validation(c, 'Jenis materi tidak valid');
     }
 
-    // Validate file_url protocol (security)
-    if (file_url && !file_url.match(/^https?:\/\//)) {
-      return Errors.validation(c, 'URL file harus dimulai dengan http:// atau https://');
+    let finalFileUrl: string | null = null;
+    let finalFileKey: string | null = null;
+    let finalFileName: string | null = null;
+    let fileSize: number | null = null;
+
+    // 1. Direct File Upload (Multipart)
+    if (file && typeof file === 'object' && file.name) {
+      const uploadResult = await uploadFile(c.env, file as any, 'materi');
+
+      if (uploadResult.error) {
+        return Errors.internal(c, `Upload gagal: ${uploadResult.error}`);
+      }
+
+      finalFileUrl = uploadResult.url;
+      finalFileKey = uploadResult.path;
+      finalFileName = file.name;
+      fileSize = file.size;
     }
-
-    // Determine final file URL
-    let finalFileUrl = file_url?.trim() || null;
-    let finalFileName = file_name?.trim() || null;
-
-    // If file_key is provided (from R2 upload), construct the API URL
-    if (file_key) {
-      finalFileUrl = `/api/files/${file_key}`;
-      // If file_name is not provided but we have a key, try to extract it or use key
-      if (!finalFileName) {
-        finalFileName = file_key.split('/').pop() || 'file';
+    // 2. Pre-uploaded File (JSON with file_key)
+    else if (body.file_key) {
+      finalFileKey = body.file_key;
+      finalFileName = body.file_name || 'file';
+      fileSize = body.file_size ? Number(body.file_size) : 0;
+      finalFileUrl = body.file_url || null; // Optional, might be generated on fly
+    }
+    // 3. External URL
+    else {
+      // Allow URL input if no file uploaded
+      const file_url = body.file_url as string;
+      if (file_url) {
+        if (!file_url.match(/^https?:\/\//)) {
+          return Errors.validation(c, 'URL file harus dimulai dengan http:// atau https://');
+        }
+        finalFileUrl = file_url;
       }
     }
 
-    const result = await c.env.DB.prepare(`
-      INSERT INTO materi (judul, deskripsi, kategori, jenjang, jenis, file_url, file_name, file_size, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      judul.trim(),
-      deskripsi?.trim() || null,
-      kategori?.trim() || null,
-      jenjang || null,
-      jenis || null,
-      finalFileUrl,
-      finalFileName,
-      file_size || null,
-      user.id
-    ).run();
+    try {
+      const result = await c.env.DB.prepare(`
+        INSERT INTO materi (judul, deskripsi, kategori, jenjang, jenis, file_url, file_key, file_name, file_size, uploaded_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        judul.trim(),
+        deskripsi ? deskripsi.trim() : null,
+        kategori ? kategori.trim() : null,
+        jenjang || null,
+        jenis || null,
+        finalFileUrl,
+        finalFileKey,
+        finalFileName,
+        fileSize,
+        user.id
+      ).run();
 
-    return successResponse(c, {
-      id: result.meta.last_row_id,
-      judul,
-      jenis,
-      jenjang,
-      file_url: finalFileUrl
-    }, 'Materi berhasil diupload', 201);
+      return successResponse(c, {
+        id: result.meta.last_row_id,
+        judul,
+        jenis,
+        jenjang,
+        file_url: finalFileUrl
+      }, 'Materi berhasil diupload', 201);
+    } catch (dbError: any) {
+      console.error('Database insert error:', dbError);
+      throw new Error(`Database error: ${dbError.message}`);
+    }
   } catch (e: any) {
     console.error('Upload materi error:', e);
     return Errors.internal(c);
@@ -154,6 +198,75 @@ materi.get('/:id', async (c) => {
     return successResponse(c, result);
   } catch (e: any) {
     console.error('Get materi detail error:', e);
+    return Errors.internal(c);
+  }
+});
+
+// Update materi (owner or admin)
+materi.put('/:id', async (c) => {
+  const sessionId = getCookie(c.req.header('Cookie'), 'session');
+  const user: any = await getCurrentUser(c.env.DB, sessionId);
+
+  if (!user) {
+    return Errors.unauthorized(c);
+  }
+
+  try {
+    const id = c.req.param('id');
+    let body: any = {};
+    try {
+      body = await c.req.json();
+    } catch (e) {
+      body = await c.req.parseBody();
+    }
+
+    if (!id || isNaN(Number(id))) {
+      return Errors.validation(c, 'ID materi tidak valid');
+    }
+
+    const existing: any = await c.env.DB.prepare(
+      'SELECT id, uploaded_by FROM materi WHERE id = ?'
+    ).bind(id).first();
+
+    if (!existing) {
+      return Errors.notFound(c, 'Materi');
+    }
+
+    if (existing.uploaded_by !== user.id && user.role !== 'admin') {
+      return Errors.forbidden(c, 'Anda tidak memiliki akses untuk mengedit materi ini');
+    }
+
+    const judul = body.judul as string;
+    const deskripsi = body.deskripsi as string;
+    const kategori = body.kategori as string;
+    const jenjang = body.jenjang as string;
+    const jenis = body.jenis as string;
+
+    if (!judul) {
+      return Errors.validation(c, 'Judul materi harus diisi');
+    }
+
+    const validJenjang = ['SD', 'Kelas 1', 'Kelas 2', 'Kelas 3', 'Kelas 4', 'Kelas 5', 'Kelas 6', 'Lainnya'];
+    if (jenjang && !validJenjang.includes(jenjang)) {
+      return Errors.validation(c, 'Jenjang/Kelas tidak valid');
+    }
+
+    await c.env.DB.prepare(`
+        UPDATE materi 
+        SET judul = ?, deskripsi = ?, kategori = ?, jenjang = ?, jenis = ?
+        WHERE id = ?
+    `).bind(
+      judul.trim(),
+      deskripsi?.trim() || null,
+      kategori?.trim() || null,
+      jenjang || null,
+      jenis || null,
+      id
+    ).run();
+
+    return successResponse(c, { id }, 'Materi berhasil diperbarui');
+  } catch (e: any) {
+    console.error('Update materi error:', e);
     return Errors.internal(c);
   }
 });
@@ -195,7 +308,7 @@ materi.delete('/:id', async (c) => {
     }
 
     const existing: any = await c.env.DB.prepare(
-      'SELECT id, uploaded_by FROM materi WHERE id = ?'
+      'SELECT id, uploaded_by, file_key FROM materi WHERE id = ?'
     ).bind(id).first();
 
     if (!existing) {
@@ -205,6 +318,11 @@ materi.delete('/:id', async (c) => {
     // Check ownership or admin
     if (existing.uploaded_by !== user.id && user.role !== 'admin') {
       return Errors.forbidden(c, 'Anda tidak memiliki akses untuk menghapus materi ini');
+    }
+
+    // Delete from storage if key exists
+    if (existing.file_key) {
+      await deleteFile(c.env, existing.file_key);
     }
 
     await c.env.DB.prepare('DELETE FROM materi WHERE id = ?').bind(id).run();

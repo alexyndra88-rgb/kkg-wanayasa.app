@@ -9,17 +9,13 @@ import {
     formatFileSize,
     isAllowedFileType,
     getFileExtension,
-    parseMultipartFormData,
-    uploadToR2,
-    getFromR2,
-    deleteFromR2,
-    type R2Bucket
 } from '../lib/upload';
+
+import { StorageBindings } from '../lib/storage';
 
 type Bindings = {
     DB: D1Database;
-    BUCKET?: R2Bucket; // R2 bucket binding (optional for development)
-};
+} & StorageBindings;
 
 const files = new Hono<{ Bindings: Bindings }>();
 
@@ -35,84 +31,32 @@ files.post('/upload', async (c) => {
     }
 
     try {
-        // Check if R2 is configured
-        if (!c.env.BUCKET) {
-            logger.warn('R2 bucket not configured', { userId: user.id });
-            return c.json({
-                success: false,
-                error: {
-                    code: ErrorCodes.CONFIG_ERROR,
-                    message: 'File storage belum dikonfigurasi. Hubungi administrator.'
-                }
-            }, 503);
-        }
-
         // Parse multipart form data
-        const { files: uploadedFiles, fields } = await parseMultipartFormData(c.req.raw);
+        const body: any = await c.req.parseBody();
+        const file = body.file as File;
 
-        if (uploadedFiles.length === 0) {
+        if (!file) {
             return Errors.validation(c, 'Tidak ada file yang diupload');
         }
 
-        const file = uploadedFiles[0]; // Single file upload
-        const extension = getFileExtension(file.filename);
+        // Use Supabase Storage
+        const { uploadFile } = await import('../lib/storage');
+        const result = await uploadFile(c.env, file as any, 'uploads');
 
-        // Validate file type
-        if (!isAllowedFileType(file.contentType, extension)) {
-            return c.json({
-                success: false,
-                error: {
-                    code: ErrorCodes.VALIDATION_ERROR,
-                    message: `Tipe file tidak didukung. Tipe yang diizinkan: ${UPLOAD_CONFIG.allowedExtensions.document.join(', ')}, ${UPLOAD_CONFIG.allowedExtensions.image.join(', ')}`
-                }
-            }, 400);
+        if (result.error) {
+            console.error('File upload failed:', result.error);
+            return Errors.internal(c, result.error || 'Gagal mengupload file');
         }
-
-        // Validate file size
-        if (file.data.byteLength > UPLOAD_CONFIG.maxFileSize) {
-            return c.json({
-                success: false,
-                error: {
-                    code: ErrorCodes.VALIDATION_ERROR,
-                    message: `Ukuran file melebihi batas maksimal ${UPLOAD_CONFIG.maxFileSizeFormatted}`
-                }
-            }, 400);
-        }
-
-        // Upload to R2
-        const result = await uploadToR2(c.env.BUCKET, file.data, {
-            filename: file.filename,
-            contentType: file.contentType,
-            size: file.data.byteLength,
-            userId: user.id
-        });
-
-        if (!result.success) {
-            logger.error('File upload failed', new Error(result.error || 'Unknown error'), { userId: user.id });
-            return c.json({
-                success: false,
-                error: {
-                    code: ErrorCodes.INTERNAL_ERROR,
-                    message: result.error || 'Gagal mengupload file'
-                }
-            }, 500);
-        }
-
-        logger.info('File uploaded', {
-            userId: user.id,
-            key: result.key,
-            filename: result.filename,
-            size: result.size
-        });
 
         return successResponse(c, {
-            key: result.key,
+            key: result.path,
             url: result.url,
-            filename: result.filename,
-            size: result.size,
-            sizeFormatted: formatFileSize(result.size || 0),
-            contentType: result.contentType
+            filename: file.name,
+            size: file.size,
+            sizeFormatted: formatFileSize(file.size || 0),
+            contentType: file.type
         }, 'File berhasil diupload', 201);
+
 
     } catch (e: any) {
         logger.error('File upload error', e, { userId: user.id });
@@ -123,37 +67,32 @@ files.post('/upload', async (c) => {
 // ============================================
 // Get File
 // ============================================
+// ============================================
+// Get File
+// ============================================
+// ============================================
+// Get File
+// ============================================
 files.get('/:key{.+}', async (c) => {
     try {
         const key = c.req.param('key');
+        if (!key) return Errors.validation(c, 'File key tidak valid');
 
-        if (!key) {
-            return Errors.validation(c, 'File key tidak valid');
+        // Supabase Logic
+        const { getSupabaseClient } = await import('../lib/storage');
+        // Validate credentials existence
+        if (!c.env.SUPABASE_URL || !c.env.SUPABASE_KEY) {
+            return Errors.configError(c, 'Supabase credentials not configured');
         }
 
-        if (!c.env.BUCKET) {
-            return Errors.configError(c, 'File storage belum dikonfigurasi');
-        }
+        const supabase = getSupabaseClient(c.env);
+        const bucket = c.env.SUPABASE_BUCKET || 'materi-kkg'; // Fallback bucket name
 
-        const file = await getFromR2(c.env.BUCKET, key);
+        const { data } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(key);
 
-        if (!file) {
-            return Errors.notFound(c, 'File');
-        }
-
-        // Set appropriate headers
-        const headers = new Headers();
-        headers.set('Content-Type', file.metadata.httpMetadata?.contentType || 'application/octet-stream');
-        headers.set('Cache-Control', 'public, max-age=31536000');
-        headers.set('ETag', file.metadata.httpEtag);
-
-        if (file.metadata.customMetadata?.originalFilename) {
-            headers.set('Content-Disposition',
-                `inline; filename="${encodeURIComponent(file.metadata.customMetadata.originalFilename)}"`
-            );
-        }
-
-        return new Response(file.body, { headers });
+        return c.redirect(data.publicUrl);
 
     } catch (e: any) {
         logger.error('Get file error', e);
@@ -168,35 +107,18 @@ files.delete('/:key{.+}', async (c) => {
     const sessionId = getCookie(c.req.header('Cookie'), 'session');
     const user: any = await getCurrentUser(c.env.DB, sessionId);
 
-    if (!user) {
-        return Errors.unauthorized(c);
-    }
+    if (!user) return Errors.unauthorized(c);
 
     try {
         const key = c.req.param('key');
+        if (!key) return Errors.validation(c, 'File key tidak valid');
 
-        if (!key) {
-            return Errors.validation(c, 'File key tidak valid');
-        }
+        const { deleteFile } = await import('../lib/storage');
+        const result = await deleteFile(c.env, key);
 
-        if (!c.env.BUCKET) {
-            return Errors.configError(c, 'File storage belum dikonfigurasi');
-        }
+        if (result.error) return Errors.internal(c, result.error);
 
-        // Check if file belongs to user (optional - can be enforced by key prefix)
-        const keyPrefix = `uploads/${user.id}/`;
-        if (!key.startsWith(keyPrefix) && user.role !== 'admin') {
-            return Errors.forbidden(c, 'Anda tidak memiliki akses untuk menghapus file ini');
-        }
-
-        const deleted = await deleteFromR2(c.env.BUCKET, key);
-
-        if (!deleted) {
-            return Errors.notFound(c, 'File');
-        }
-
-        logger.info('File deleted', { userId: user.id, key });
-
+        logger.info('File deleted (Supabase)', { userId: user.id, key });
         return successResponse(c, null, 'File berhasil dihapus');
 
     } catch (e: any) {
@@ -216,7 +138,7 @@ files.get('/config', async (c) => {
         allowedExtensions: {
             ...UPLOAD_CONFIG.allowedExtensions
         },
-        isConfigured: !!c.env.BUCKET
+        isConfigured: !!(c.env.SUPABASE_URL && c.env.SUPABASE_KEY)
     });
 });
 

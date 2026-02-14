@@ -1,6 +1,7 @@
 // Reusable UI Components
 import { state } from './state.js';
 import { escapeHtml, avatar, badge } from './utils.js';
+import { renderNotificationBell } from './notifications.js';
 
 /**
  * Render navigation bar
@@ -66,6 +67,8 @@ export function renderNavbar() {
 
           <!-- User Menu -->
           <div class="flex items-center space-x-3">
+            ${isLoggedIn ? renderNotificationBell() : ''}
+            
             ${isLoggedIn ? `
               <div class="relative group">
                 <button class="flex items-center space-x-2 p-1 pr-3 rounded-full hover:bg-[var(--color-bg-tertiary)] transition-colors border border-transparent hover:border-[var(--color-border-subtle)]">

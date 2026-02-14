@@ -201,21 +201,47 @@ window.updateProfile = async function (e) {
     mapelValue = form.mata_pelajaran_custom.value;
   }
 
-  const data = {
-    nama: form.nama.value,
-    nip: form.nip.value,
-    nik: form.nik.value,
-    no_hp: form.no_hp.value,
-    alamat: form.alamat.value,
-    sekolah: form.sekolah.value,
-    mata_pelajaran: mapelValue
-  };
+  // Use FormData for file upload support
+  const formData = new FormData();
+  formData.append('nama', form.nama.value);
+  formData.append('nip', form.nip.value);
+  formData.append('nik', form.nik.value);
+  formData.append('no_hp', form.no_hp.value);
+  formData.append('alamat', form.alamat.value);
+  formData.append('sekolah', form.sekolah.value);
+  formData.append('mata_pelajaran', mapelValue);
+
+  // Check if there is a pending photo upload
+  const fileInput = document.querySelector('input[type="file"][onchange="uploadProfilePhoto(this)"]');
+  if (fileInput && fileInput.files.length > 0) {
+    formData.append('foto', fileInput.files[0]);
+  }
 
   try {
-    const res = await api('/profile', {
+    // We use raw fetch here because api() wrapper usually sends JSON
+    // and setting Content-Type: multipart/form-data manually is tricky (boundary issue)
+    // letting browser set it automatically is better.
+
+    // Get headers (CSRF)
+    const headers = {};
+    const csrfMatch = document.cookie.match(/csrf_token=([^;]+)/);
+    if (csrfMatch) headers['X-CSRF-Token'] = csrfMatch[1];
+
+    const tokenMatch = document.cookie.match(/session=([^;]+)/);
+    // Browser sends cookie automatically, but we might need Bearer if API expects it
+
+    const response = await fetch('/api/guru/profile', {
       method: 'PUT',
-      body: data
+      headers: headers,
+      body: formData
     });
+
+    const res = await response.json();
+
+    if (!res.success) {
+      const errorMsg = res.error?.message || res.message || 'Gagal update profil';
+      throw new Error(errorMsg);
+    }
 
     // Update local state and UI
     state.user = { ...state.user, ...res.data };
@@ -229,6 +255,21 @@ window.updateProfile = async function (e) {
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalText;
+  }
+}
+
+window.uploadProfilePhoto = function (input) {
+  if (input.files && input.files[0]) {
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = input.closest('.relative').querySelector('img');
+      img.src = e.target.result;
+    }
+    reader.readAsDataURL(input.files[0]);
+
+    // Show toast instructing user to save
+    showToast('Foto dipilih. Klik "Simpan Perubahan" untuk mengupload.', 'info');
   }
 }
 
@@ -274,52 +315,7 @@ window.changePassword = async function (e) {
   }
 }
 
-window.uploadProfilePhoto = async function (input) {
-  if (!input.files || input.files.length === 0) return;
-
-  const file = input.files[0];
-  if (file.size > 2 * 1024 * 1024) {
-    showToast('Ukuran foto maksimal 2MB', 'error');
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append('file', file);
-
-  showToast('Mengupload foto...', 'info');
-
-  try {
-    // Upload to general file upload endpoint first
-    // Note: we need to handle auth header manually if using fetch with FormData, 
-    // but our API wrapper handles JSON mainly. 
-    // Let's rely on browser cookies for auth.
-
-    // However, we need CSRF token.
-    const csrfToken = getCookie('csrf_token');
-
-    const uploadRes = await fetch('/api/files/upload', {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'X-CSRF-Token': csrfToken
-      }
-    }).then(r => r.json());
-
-    if (!uploadRes.success) throw new Error(uploadRes.message || 'Gagal upload foto');
-
-    // Update profile with new photo URL
-    await api('/profile/photo', {
-      method: 'POST',
-      body: { photo_url: uploadRes.data.url }
-    });
-
-    showToast('Foto profil berhasil diperbarui', 'success');
-    setTimeout(() => window.location.reload(), 1000);
-
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-}
+// Old uploadProfilePhoto removed as it's now handled by updateProfile
 
 function getCookie(name) {
   const value = `; ${document.cookie}`;

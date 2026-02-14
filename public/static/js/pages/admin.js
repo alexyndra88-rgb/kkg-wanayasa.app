@@ -966,6 +966,62 @@ window.saveProfilKKG = async function () {
   } catch (e) { showToast(e.message, 'error'); }
 }
 
+window.uploadLogo = async function (input) {
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+
+    // Validate size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Ukuran file maksimal 2MB', 'error');
+      input.value = '';
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('logo', file);
+
+    const previewContainer = document.getElementById('logo-preview');
+    const originalContent = previewContainer.innerHTML;
+    previewContainer.innerHTML = '<div class="flex items-center justify-center h-full"><i class="fas fa-spinner fa-spin text-2xl text-[var(--color-primary)]"></i></div>';
+
+    try {
+      // Use fetch directly for FormData to let browser set Content-Type with boundary
+      const headers = {};
+      const csrfMatch = document.cookie.match(/csrf_token=([^;]+)/);
+      if (csrfMatch) headers['X-CSRF-Token'] = csrfMatch[1];
+
+      const res = await fetch('/api/admin/settings/logo', {
+        method: 'POST',
+        headers: headers,
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (!data.success) throw new Error(data.message || 'Gagal upload logo');
+
+      // Update preview
+      previewContainer.innerHTML = `<img src="${data.data.logo_url}" alt="Logo KKG" class="w-full h-full object-contain">`;
+
+      // Update state
+      if (window.state && window.state.settings) {
+        window.state.settings.logo_url = data.data.logo_url;
+      }
+
+      showToast('Logo berhasil diupload', 'success');
+
+      // Reload to update logo everywhere
+      setTimeout(() => window.location.reload(), 1500);
+
+    } catch (e) {
+      console.error(e);
+      showToast(e.message, 'error');
+      previewContainer.innerHTML = originalContent;
+      input.value = '';
+    }
+  }
+}
+
 // Global scope expose for inline onclicks
 window.clearAllCaches = async function () {
   // call global from main.js if accessible or reimplement

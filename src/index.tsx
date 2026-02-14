@@ -17,6 +17,7 @@ import templatesRoutes from './routes/templates';
 import sekolahRoutes from './routes/sekolah';
 import settingsRoutes from './routes/settings';
 import profileRoutes from './routes/profile';
+import notificationRoutes from './routes/notifications';
 import { renderHTML } from './templates/layout';
 import { rateLimitMiddleware, RATE_LIMITS } from './lib/ratelimit';
 import { successResponse, Errors } from './lib/response';
@@ -99,6 +100,7 @@ app.route('/api/templates', templatesRoutes);
 app.route('/api/sekolah', sekolahRoutes);
 app.route('/api/settings', settingsRoutes);
 app.route('/api/profile', profileRoutes);
+app.route('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/api/health', (c) => {
@@ -225,6 +227,18 @@ CREATE TABLE IF NOT EXISTS sekolah (
 );
 CREATE INDEX IF NOT EXISTS idx_sekolah_nama ON sekolah(nama);
 CREATE INDEX IF NOT EXISTS idx_sekolah_tipe ON sekolah(tipe);
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  type TEXT NOT NULL DEFAULT 'info',
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  link TEXT,
+  is_read INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 `;
     const stmts = schema.split(';').filter(s => s.trim());
     for (const stmt of stmts) {
