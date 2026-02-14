@@ -36,7 +36,7 @@ export async function renderHome() {
         </p>
         
         <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          ${state.user ? `
+          ${state.user ? (state.user.role === 'admin' ? `
           <button onclick="navigate('surat')" class="btn bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 text-lg shadow-xl shadow-emerald-900/20 hover:scale-105 transition-transform duration-300 border border-emerald-400/20 rounded-xl font-bold">
             <i class="fas fa-envelope mr-3"></i>Buat Surat Undangan
           </button>
@@ -44,6 +44,13 @@ export async function renderHome() {
             <i class="fas fa-file-alt mr-3"></i>Buat Program Kerja
           </button>
           ` : `
+          <button onclick="navigate('pengumuman')" class="btn bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 text-lg shadow-xl shadow-emerald-900/20 hover:scale-105 transition-transform duration-300 border border-emerald-400/20 rounded-xl font-bold">
+            <i class="fas fa-bullhorn mr-3"></i>Lihat Pengumuman
+          </button>
+          <button onclick="navigate('materi')" class="btn bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-sm px-8 py-3 text-lg transition-all duration-300 rounded-xl font-medium">
+            <i class="fas fa-book mr-3"></i>Akses Materi
+          </button>
+          `) : `
           <button onclick="navigate('login')" class="btn bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 text-lg shadow-xl shadow-emerald-900/20 font-bold border-none rounded-xl">
             <i class="fas fa-sign-in-alt mr-3"></i>Masuk Portal
           </button>
