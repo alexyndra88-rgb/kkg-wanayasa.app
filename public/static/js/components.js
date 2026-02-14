@@ -186,11 +186,11 @@ export function renderFooter() {
               </li>
               <li class="flex items-center gap-3">
                 <i class="fas fa-envelope text-primary-500"></i>
-                <span>${escapeHtml(state.settings?.email || 'sekretariat@kkg-wanayasa.id')}</span>
+                <span>${escapeHtml(state.settings?.email || 'andris4u@gmail.com')}</span>
               </li>
               <li class="flex items-center gap-3">
                 <i class="fab fa-whatsapp text-primary-500"></i>
-                <span>+62 812-3456-7890</span>
+                <span>0895-3291-07413</span>
               </li>
             </ul>
           </div>
