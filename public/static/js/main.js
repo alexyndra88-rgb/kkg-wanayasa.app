@@ -11,7 +11,7 @@ import { renderNavbar, renderFooter, toggleMobileMenu } from './components.js';
 // Theme & Accessibility
 import { initTheme, toggleTheme, renderThemeToggle } from './theme.js';
 import { initA11y, announce, renderSkipLinks } from './a11y.js';
-import { fetchUnreadCount } from './notifications.js';
+import { fetchUnreadCount, renderNotificationBell } from './notifications.js';
 
 // Pages
 // Pages are now loaded dynamically
@@ -163,7 +163,9 @@ async function render() {
       pengumuman: 'Pengumuman',
       admin: 'Panel Admin',
       'reset-password': 'Reset Password',
-      laporan: 'Laporan Kegiatan'
+      'reset-password': 'Reset Password',
+      laporan: 'Laporan Kegiatan',
+      notifications: 'Pusat Notifikasi'
     };
     // announce disabled
 
@@ -271,9 +273,12 @@ async function render() {
                 ${state.settings?.logo_url ? `<img src="${state.settings.logo_url}" class="h-8 w-8 object-contain">` : '<i class="fas fa-shapes text-2xl text-primary-600"></i>'}
                 <span class="font-display font-bold text-lg text-[var(--color-text-primary)]">KKG Portal</span>
              </div>
-            <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] rounded-full transition-colors">
-              <i class="fas fa-bars text-xl"></i>
-            </button>
+             <div class="flex items-center gap-2">
+                ${state.user ? renderNotificationBell() : ''}
+                <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="p-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] rounded-full transition-colors">
+                  <i class="fas fa-bars text-xl"></i>
+                </button>
+             </div>
           </header>
 
           <!-- Main Content Area -->
@@ -511,6 +516,11 @@ window.logout = async function () {
   // Redirect
   navigate('home');
 };
+
+// Poll notifications every 30s
+setInterval(() => {
+  if (typeof state !== 'undefined' && state.user) fetchUnreadCount();
+}, 30000);
 
 // Start the app
 init().catch(e => {

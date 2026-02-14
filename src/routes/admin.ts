@@ -10,6 +10,7 @@ import {
   cleanOldAuditLogs,
   formatAuditAction
 } from '../lib/audit';
+import { createNotification } from '../lib/notification';
 import type { DashboardStats, Settings } from '../types';
 
 
@@ -36,6 +37,17 @@ const requireAdmin = async (c: any, next: () => Promise<void>) => {
 };
 
 admin.use('/*', requireAdmin);
+
+// Test Notification Endpoint
+admin.post('/test-notification', async (c) => {
+  const user = c.get('user');
+  try {
+    await createNotification(c.env.DB, user.id, 'Tes Notifikasi 🔔', `Ini adalah notifikasi tes dikirim pada ${new Date().toLocaleTimeString()}.`, 'info', '/notifications');
+    return successResponse(c, null, 'Notifikasi tes berhasil dikirim');
+  } catch (e: any) {
+    return Errors.internal(c, e.message);
+  }
+});
 
 // Dashboard stats
 admin.get('/dashboard', async (c) => {

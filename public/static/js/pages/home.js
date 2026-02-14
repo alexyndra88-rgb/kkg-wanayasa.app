@@ -1,7 +1,8 @@
 import { api } from '../api.js';
 import { state } from '../state.js';
 import { navigate } from '../router.js';
-import { formatDateTime, escapeHtml } from '../utils.js';
+import { formatDateTime, escapeHtml, showToast } from '../utils.js';
+import { fetchUnreadCount } from '../notifications.js';
 
 export async function renderHome() {
   let pengumuman = [];
@@ -42,6 +43,10 @@ export async function renderHome() {
           </button>
           <button onclick="navigate('proker')" class="btn bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-sm px-8 py-3 text-lg transition-all duration-300 rounded-xl font-medium">
             <i class="fas fa-file-alt mr-3"></i>Buat Program Kerja
+          </button>
+          
+          <button onclick="window.testNotification()" class="absolute bottom-4 right-4 text-xs bg-white/10 px-3 py-1 rounded hover:bg-white/20 text-white/50 hover:text-white transition-colors" title="Kirim Notifikasi Tes">
+            <i class="fas fa-bell"></i>
           </button>
           ` : `
           <button onclick="navigate('pengumuman')" class="btn bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 text-lg shadow-xl shadow-emerald-900/20 hover:scale-105 transition-transform duration-300 border border-emerald-400/20 rounded-xl font-bold">
@@ -174,4 +179,16 @@ export async function renderHome() {
       </div>
     </section>
   </div>`;
+}
+
+// Manual Test Notification Trigger
+window.testNotification = async function () {
+  try {
+    await api('/admin/test-notification', { method: 'POST' });
+    showToast('Notifikasi tes berhasil diproses backend!', 'success');
+    // Update badge immediately
+    setTimeout(() => fetchUnreadCount(), 500);
+  } catch (e) {
+    showToast('Gagal kirim tes: ' + (e.message || 'Unknown error'), 'error');
+  }
 }
